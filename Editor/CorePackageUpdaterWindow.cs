@@ -9,7 +9,7 @@ namespace Core.Editor
     public class CorePackageUpdaterWindow : EditorWindow
     {
         private const string PackageId = "com.tmn.core";
-        private const string GitRepositoryUrl = "https://github.com/Zart-Zurt/TMNCore.git";
+        private const string GitRepositoryUrl = "https://github.com/Zart-Zurt/TMNCore.git#main";
         private const string LocalPackageUrl = "file:../../TMN-Core";
 
         private static AddRequest _addRequest;
@@ -40,6 +40,29 @@ namespace Core.Editor
                 return;
             }
 
+            var currentHash = GetCurrentInstalledGitHashStatic();
+            if (TryGetRemoteCommitHash(GitRepositoryUrl, "main", out var remoteHash))
+            {
+                if (!string.IsNullOrEmpty(currentHash) &&
+                    (currentHash.Equals(remoteHash, System.StringComparison.OrdinalIgnoreCase) ||
+                     remoteHash.StartsWith(currentHash, System.StringComparison.OrdinalIgnoreCase) ||
+                     currentHash.StartsWith(remoteHash, System.StringComparison.OrdinalIgnoreCase)))
+                {
+                    var shortHash = remoteHash.Length > 7 ? remoteHash.Substring(0, 7) : remoteHash;
+                    var force = EditorUtility.DisplayDialog(
+                        "TMN Core Updater",
+                        $"TMN Core is already at the latest commit!\n\nInstalled commit: {shortHash}\nRemote commit: {shortHash}\n\nDo you want to force re-download anyway?",
+                        "Force Re-download",
+                        "Cancel");
+
+                    if (!force)
+                    {
+                        return;
+                    }
+                }
+            }
+
+            ClearPackageLocks(PackageId);
             _addRequest = Client.Add(GitRepositoryUrl);
             EditorApplication.update += MonitorQuickAddRequest;
             EditorUtility.DisplayProgressBar("TMN Core Updater", "Fetching latest Core from GitHub...", 0.5f);
@@ -98,7 +121,7 @@ namespace Core.Editor
         {
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("TMN Core Package Updater", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Manage and synchronize the Core framework across projects.", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("Manage and synchronize the TMN Core package across projects.", EditorStyles.miniLabel);
             EditorGUILayout.Space(10);
         }
 
@@ -125,6 +148,29 @@ namespace Core.Editor
 
             if (GUILayout.Button("Update to Latest (main branch)", GUILayout.Height(32)))
             {
+                var currentHash = GetCurrentInstalledGitHash();
+                if (TryGetRemoteCommitHash(GitRepositoryUrl, "main", out var remoteHash))
+                {
+                    if (!string.IsNullOrEmpty(currentHash) &&
+                        (currentHash.Equals(remoteHash, System.StringComparison.OrdinalIgnoreCase) ||
+                         remoteHash.StartsWith(currentHash, System.StringComparison.OrdinalIgnoreCase) ||
+                         currentHash.StartsWith(remoteHash, System.StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var shortHash = remoteHash.Length > 7 ? remoteHash.Substring(0, 7) : remoteHash;
+                        var force = EditorUtility.DisplayDialog(
+                            "TMN Core Updater",
+                            $"TMN Core is already at the latest commit!\n\nInstalled commit: {shortHash}\nRemote commit: {shortHash}\n\nDo you want to force re-download anyway?",
+                            "Force Re-download",
+                            "Cancel");
+
+                        if (!force)
+                        {
+                            SetStatus($"Already up to date with origin/main ({shortHash}).", MessageType.Info);
+                            return;
+                        }
+                    }
+                }
+
                 StartUpdate(GitRepositoryUrl);
             }
 
@@ -140,7 +186,31 @@ namespace Core.Editor
                 }
                 else
                 {
-                    StartUpdate(GitRepositoryUrl + "#" + _targetTagOrBranch.Trim());
+                    var branchOrTag = _targetTagOrBranch.Trim();
+                    var currentHash = GetCurrentInstalledGitHash();
+                    if (TryGetRemoteCommitHash(GitRepositoryUrl, branchOrTag, out var remoteHash))
+                    {
+                        if (!string.IsNullOrEmpty(currentHash) &&
+                            (currentHash.Equals(remoteHash, System.StringComparison.OrdinalIgnoreCase) ||
+                             remoteHash.StartsWith(currentHash, System.StringComparison.OrdinalIgnoreCase) ||
+                             currentHash.StartsWith(remoteHash, System.StringComparison.OrdinalIgnoreCase)))
+                        {
+                            var shortHash = remoteHash.Length > 7 ? remoteHash.Substring(0, 7) : remoteHash;
+                            var force = EditorUtility.DisplayDialog(
+                                "TMN Core Updater",
+                                $"TMN Core is already at the target commit for '{branchOrTag}'!\n\nInstalled commit: {shortHash}\n\nDo you want to force re-download anyway?",
+                                "Force Re-download",
+                                "Cancel");
+
+                            if (!force)
+                            {
+                                SetStatus($"Already at latest commit for {branchOrTag} ({shortHash}).", MessageType.Info);
+                                return;
+                            }
+                        }
+                    }
+
+                    StartUpdate(GitRepositoryUrl.Split('#')[0] + "#" + branchOrTag);
                 }
             }
             EditorGUILayout.EndHorizontal();
@@ -185,6 +255,11 @@ namespace Core.Editor
         private void StartUpdate(string targetIdentifier)
         {
             _isBusy = true;
+            if (targetIdentifier.StartsWith("https://", System.StringComparison.OrdinalIgnoreCase))
+            {
+                ClearPackageLocks(PackageId);
+            }
+
             SetStatus("Updating package from: " + targetIdentifier, MessageType.Info);
             _addRequest = Client.Add(targetIdentifier);
         }
@@ -257,6 +332,7 @@ namespace Core.Editor
         private void ForceClearLockAndResolve()
         {
             _isBusy = true;
+            ClearPackageLocks(PackageId);
             SetStatus("Resolving packages...", MessageType.Info);
             Client.Resolve();
             RefreshInstalledPackageInfo();
@@ -267,6 +343,151 @@ namespace Core.Editor
             _statusMessage = message;
             _statusMessageType = messageType;
             Repaint();
+        }
+
+        private string GetCurrentInstalledGitHash()
+        {
+            if (!string.IsNullOrEmpty(_installedHash))
+            {
+                return _installedHash;
+            }
+
+            return GetCurrentInstalledGitHashStatic();
+        }
+
+        private static string GetCurrentInstalledGitHashStatic()
+        {
+            var info = UnityEditor.PackageManager.PackageInfo.FindForAssetPath("Packages/" + PackageId);
+            if (info != null && info.git != null && !string.IsNullOrEmpty(info.git.hash))
+            {
+                return info.git.hash;
+            }
+
+            return string.Empty;
+        }
+
+        private static bool TryGetRemoteCommitHash(string repoUrl, string branchOrTag, out string remoteHash)
+        {
+            remoteHash = string.Empty;
+            try
+            {
+                var target = string.IsNullOrWhiteSpace(branchOrTag) ? "main" : branchOrTag.Trim();
+                var cleanRepoUrl = repoUrl;
+                var hashIndex = cleanRepoUrl.IndexOf('#');
+                if (hashIndex >= 0)
+                {
+                    cleanRepoUrl = cleanRepoUrl.Substring(0, hashIndex);
+                }
+
+                var process = new System.Diagnostics.Process();
+                process.StartInfo.FileName = "git";
+                process.StartInfo.Arguments = $"ls-remote \"{cleanRepoUrl}\" refs/heads/{target} refs/tags/{target}";
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.CreateNoWindow = true;
+                process.Start();
+
+                var output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit(3000);
+
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    var lines = output.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+                    if (lines.Length > 0)
+                    {
+                        var parts = lines[0].Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length > 0 && parts[0].Length >= 7)
+                        {
+                            remoteHash = parts[0];
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[TMNCore] Failed to query remote git hash: {ex.Message}");
+            }
+
+            return false;
+        }
+
+        private static void ClearPackageLocks(params string[] packageIds)
+        {
+            try
+            {
+                var lockFilePath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages", "packages-lock.json"));
+                if (!File.Exists(lockFilePath))
+                {
+                    return;
+                }
+
+                var text = File.ReadAllText(lockFilePath);
+                var modified = false;
+
+                foreach (var id in packageIds)
+                {
+                    var targetKey = $"\"{id}\"";
+                    var startIndex = text.IndexOf(targetKey, System.StringComparison.Ordinal);
+                    if (startIndex < 0)
+                    {
+                        continue;
+                    }
+
+                    var openBraceIndex = text.IndexOf('{', startIndex);
+                    if (openBraceIndex < 0)
+                    {
+                        continue;
+                    }
+
+                    var depth = 1;
+                    var endIndex = openBraceIndex + 1;
+                    while (endIndex < text.Length && depth > 0)
+                    {
+                        if (text[endIndex] == '{')
+                        {
+                            depth++;
+                        }
+                        else if (text[endIndex] == '}')
+                        {
+                            depth--;
+                        }
+
+                        endIndex++;
+                    }
+
+                    if (endIndex < text.Length && text[endIndex] == ',')
+                    {
+                        endIndex++;
+                    }
+                    else
+                    {
+                        var prevIndex = startIndex - 1;
+                        while (prevIndex >= 0 && char.IsWhiteSpace(text[prevIndex]))
+                        {
+                            prevIndex--;
+                        }
+
+                        if (prevIndex >= 0 && text[prevIndex] == ',')
+                        {
+                            startIndex = prevIndex;
+                        }
+                    }
+
+                    text = text.Remove(startIndex, endIndex - startIndex);
+                    modified = true;
+                }
+
+                if (modified)
+                {
+                    File.WriteAllText(lockFilePath, text);
+                    AssetDatabase.Refresh();
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[TMNCore] Failed to clear lock entries: {ex.Message}");
+            }
         }
     }
 }
