@@ -2,6 +2,16 @@
 
 All notable changes to this package will be documented in this file.
 
+## [1.1.0] - 2026-10-17
+### Added
+- Integrated Multi-Platform AutoBuilder framework (`AutoBuilder`) supporting:
+  - Steam & Windows Standalone builds with SteamCMD upload, VDF generation, and error handling.
+  - Android APK and Google Play App Bundle (.aab) builds with automated keystore management and optional ADB device deployment.
+  - iOS Xcode project export with macOS host environment enforcement (`OSXEditor`).
+  - WebGL builds with compression options, embedded C# `HttpListener` local test server, and static/API deployment to Penta (`C:\WebProjects\Penta`).
+- Platform Strategy architecture (`IPlatformBuilder`) with host support validation.
+- Interactive platform toolbar with manual "Switch Platform" button in `AutoBuilderWindow`.
+
 ## [1.0.4] - 2026-10-07
 ### Removed
 - Removed obsolete Google Sheets synchronization tools (`DataSyncEditorWindow` and `LocalizationSyncEditorWindow`) in favor of PentaCore backend services.
