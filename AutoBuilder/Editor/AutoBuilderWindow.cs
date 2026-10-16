@@ -24,9 +24,6 @@ namespace AutoBuilder.Editor
 
         private IPlatformBuilder ActiveBuilder => _builders[_selectedPlatformIndex];
 
-        [MenuItem("ZZEngine/Auto Builder", priority = 10)]
-        [MenuItem("ZZEngine/Build/Auto Builder", priority = 11)]
-        [MenuItem("Window/Auto Builder")]
         public static void OpenWindow()
         {
             var window = GetWindow<AutoBuilderWindow>("Auto Builder");
