@@ -26,6 +26,18 @@ namespace Core.Editor
         [MenuItem("ZZEngine/Packages/TMN Core/Package Updater Window", priority = 50)]
         public static void ShowWindow()
         {
+            var centerType = System.Type.GetType("Penta.Editor.ZZEngineControlCenterWindow, Penta.Editor")
+                          ?? System.Type.GetType("Penta.Editor.PentaCoreWindow, Penta.Editor");
+            if (centerType != null)
+            {
+                var method = centerType.GetMethod("OpenControlCenter", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (method != null)
+                {
+                    method.Invoke(null, null);
+                    return;
+                }
+            }
+
             var window = GetWindow<CorePackageUpdaterWindow>("TMN Core Updater");
             window.minSize = new Vector2(400, 330);
             window.Show();
@@ -34,6 +46,17 @@ namespace Core.Editor
         [MenuItem("ZZEngine/Packages/TMN Core/Quick Update to Latest", priority = 51)]
         public static void QuickUpdateToLatest()
         {
+            var overviewType = System.Type.GetType("Penta.Editor.ZZEnginePackagesOverviewView, Penta.Editor");
+            if (overviewType != null)
+            {
+                var method = overviewType.GetMethod("QuickUpdateAllPackagesStatic", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (method != null)
+                {
+                    method.Invoke(null, null);
+                    return;
+                }
+            }
+
             if (_addRequest != null && !_addRequest.IsCompleted)
             {
                 EditorUtility.DisplayDialog("TMN Core Updater", "An update request is already in progress.", "OK");
