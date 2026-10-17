@@ -110,6 +110,23 @@ namespace AutoBuilder.Editor
                     }
                 }
             }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "GitHub Pages Dağıtımı (İlk Kurulum):\nGitHub reposunda bir kerelik 'Settings > Pages' bölümüne gidip Branch olarak 'gh-pages' / '/ (root)' seçilmeli ve Save denilmelidir. Ardından build çıktısını bu branch'e push ederek Penta'ya URL olarak bağlayabilirsiniz.",
+                    MessageType.Info);
+
+                var folder = GetLastBuildFolder();
+                if (Directory.Exists(folder))
+                {
+                    GUI.backgroundColor = new Color(0.2f, 0.7f, 1f);
+                    if (GUILayout.Button("Deploy Last Build to GitHub Pages Now", GUILayout.Height(30)))
+                    {
+                        DeployToGitHubPagesDirectly();
+                    }
+                    GUI.backgroundColor = Color.white;
+                }
+            }
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Version & Output Info", EditorStyles.boldLabel);
@@ -241,6 +258,65 @@ namespace AutoBuilder.Editor
                 AssetDatabase.CreateAsset(_config, assetPath);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
+            }
+        }
+
+        private void DeployToGitHubPagesDirectly()
+        {
+            var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            var scriptPath = Path.Combine(projectRoot, "Deploy-WebGl-To-GitHubPages.ps1");
+
+            if (!File.Exists(scriptPath))
+            {
+                EditorUtility.DisplayDialog("Script Missing", "Deploy-WebGl-To-GitHubPages.ps1 not found in project root.", "OK");
+                return;
+            }
+
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"",
+                WorkingDirectory = projectRoot,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            EditorUtility.DisplayProgressBar("Deploying to GitHub Pages", "Pushing WebGL build to gh-pages branch...", 0.5f);
+
+            try
+            {
+                using var process = System.Diagnostics.Process.Start(startInfo);
+                if (process == null)
+                {
+                    EditorUtility.ClearProgressBar();
+                    EditorUtility.DisplayDialog("Error", "Could not start PowerShell process.", "OK");
+                    return;
+                }
+
+                var output = process.StandardOutput.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+
+                EditorUtility.ClearProgressBar();
+
+                if (process.ExitCode == 0)
+                {
+                    Debug.Log($"[GitHub Pages Deploy] {output}");
+                    EditorUtility.DisplayDialog("Success", "WebGL build was successfully pushed to 'gh-pages' branch!\n\nGitHub Pages URL:\nhttps://zart-zurt.github.io/PiggySmash/", "OK");
+                }
+                else
+                {
+                    Debug.LogError($"[GitHub Pages Deploy Error] {error}\n{output}");
+                    EditorUtility.DisplayDialog("Deployment Failed", error, "OK");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                EditorUtility.ClearProgressBar();
+                Debug.LogError($"[GitHub Pages Deploy Exception] {ex.Message}");
+                EditorUtility.DisplayDialog("Error", ex.Message, "OK");
             }
         }
     }
