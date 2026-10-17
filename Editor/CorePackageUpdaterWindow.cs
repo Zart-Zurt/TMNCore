@@ -23,7 +23,6 @@ namespace Core.Editor
         private MessageType _statusMessageType = MessageType.Info;
         private bool _isBusy;
 
-        [MenuItem("ZZEngine/Packages/TMN Core/Package Updater Window", priority = 50)]
         public static void ShowWindow()
         {
             var centerType = System.Type.GetType("Penta.Editor.ZZEngineControlCenterWindow, Penta.Editor")
@@ -43,7 +42,6 @@ namespace Core.Editor
             window.Show();
         }
 
-        [MenuItem("ZZEngine/Packages/TMN Core/Quick Update to Latest", priority = 51)]
         public static void QuickUpdateToLatest()
         {
             var overviewType = System.Type.GetType("Penta.Editor.ZZEnginePackagesOverviewView, Penta.Editor");
