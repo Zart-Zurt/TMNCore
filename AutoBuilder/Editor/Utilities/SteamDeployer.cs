@@ -273,27 +273,28 @@ namespace AutoBuilder.Editor
         public static bool UpdateAppIdInScript(uint activeAppId)
         {
             var guids = AssetDatabase.FindAssets("AppIdHolder t:Script");
-            if (guids.Length == 0)
+            for (var i = 0; i < guids.Length; i++)
             {
-                Debug.LogError("[AutoBuilder] AppIdHolder.cs not found!");
-                return false;
-            }
-
-            var path = AssetDatabase.GUIDToAssetPath(guids[0]);
-            var content = File.ReadAllText(path);
-
-            var pattern = @"return\s+\d+\s*;";
-            var replacement = $"return {activeAppId};";
-
-            if (Regex.IsMatch(content, pattern))
-            {
-                var newContent = Regex.Replace(content, pattern, replacement);
-                if (newContent != content)
+                var path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
                 {
-                    File.WriteAllText(path, newContent);
-                    AssetDatabase.ImportAsset(path);
-                    Debug.Log($"[AutoBuilder] AppIdHolder.cs updated. Active ID: {activeAppId}");
-                    return true;
+                    continue;
+                }
+
+                var content = File.ReadAllText(path);
+                var pattern = @"return\s+\d+\s*;";
+                var replacement = $"return {activeAppId};";
+
+                if (Regex.IsMatch(content, pattern))
+                {
+                    var newContent = Regex.Replace(content, pattern, replacement);
+                    if (newContent != content)
+                    {
+                        File.WriteAllText(path, newContent);
+                        AssetDatabase.ImportAsset(path);
+                        Debug.Log($"[AutoBuilder] AppIdHolder.cs updated. Active ID: {activeAppId}");
+                        return true;
+                    }
                 }
             }
 

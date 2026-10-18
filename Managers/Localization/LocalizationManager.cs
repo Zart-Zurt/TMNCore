@@ -10,6 +10,7 @@ using UnityDebug = UnityEngine.Debug;
 
 namespace Core.Localization
 {
+    [DefaultExecutionOrder(-110)]
     [AddComponentMenu("Core/Localization/Localization Manager")]
     public class LocalizationManager : Singleton<LocalizationManager>
     {

@@ -6,13 +6,14 @@ namespace AutoBuilder.Editor
     [CreateAssetMenu(fileName = "AndroidConfigSO", menuName = "Auto Builder/AndroidConfigSO")]
     public class AndroidBuildConfigSO : ScriptableObject
     {
+        private const string KeystorePasswordPrefKey = "AutoBuilder_Android_KeystorePassword";
+        private const string KeyPasswordPrefKey = "AutoBuilder_Android_KeyPassword";
+
         [SerializeField] private bool buildAppBundle;
         [SerializeField] private AndroidArchitecture targetArchitectures = AndroidArchitecture.ARM64;
         [SerializeField] private bool useCustomKeystore;
         [SerializeField] private string keystorePath = "";
-        [SerializeField] private string keystorePassword = "";
         [SerializeField] private string keyAlias = "";
-        [SerializeField] private string keyPassword = "";
         [SerializeField] private bool autoInstallViaAdb = true;
 
         public bool BuildAppBundle
@@ -41,8 +42,8 @@ namespace AutoBuilder.Editor
 
         public string KeystorePassword
         {
-            get => keystorePassword;
-            set => keystorePassword = value;
+            get => EditorPrefs.GetString(KeystorePasswordPrefKey, "");
+            set => EditorPrefs.SetString(KeystorePasswordPrefKey, value ?? "");
         }
 
         public string KeyAlias
@@ -53,8 +54,8 @@ namespace AutoBuilder.Editor
 
         public string KeyPassword
         {
-            get => keyPassword;
-            set => keyPassword = value;
+            get => EditorPrefs.GetString(KeyPasswordPrefKey, "");
+            set => EditorPrefs.SetString(KeyPasswordPrefKey, value ?? "");
         }
 
         public bool AutoInstallViaAdb
@@ -64,3 +65,4 @@ namespace AutoBuilder.Editor
         }
     }
 }
+

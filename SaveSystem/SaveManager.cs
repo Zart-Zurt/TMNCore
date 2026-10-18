@@ -16,6 +16,7 @@ using Steamworks;
 
 namespace Core.Save
 {
+    [DefaultExecutionOrder(-100)]
     [AddComponentMenu("Core/Save/Save Manager")]
     public class SaveManager : Singleton<SaveManager>
     {
@@ -60,6 +61,14 @@ namespace Core.Save
         private void OnApplicationQuitting()
         {
             SaveAll();
+        }
+
+        private void OnApplicationPause(bool isPaused)
+        {
+            if (isPaused && Application.isPlaying)
+            {
+                SaveAll();
+            }
         }
 
         private void OnSceneUnloaded(Scene scene)
@@ -233,7 +242,15 @@ namespace Core.Save
             }
 
             var path = GetSlotPath(ActiveSlotIndex);
-            File.WriteAllText(path, json);
+            var tempPath = path + ".tmp";
+            File.WriteAllText(tempPath, json, Encoding.UTF8);
+
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
+            File.Move(tempPath, path);
 
 #if USE_STEAMWORKS
             if (SteamClient.IsValid)

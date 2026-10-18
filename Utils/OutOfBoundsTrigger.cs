@@ -36,7 +36,7 @@ namespace Core.Utils
                 return;
             }
 
-            if (recycleToPool && PoolManager.Instance != null)
+            if (recycleToPool && PoolManager.HasInstance)
             {
                 PoolManager.Instance.Despawn(target);
             }

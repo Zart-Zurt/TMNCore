@@ -86,7 +86,6 @@ namespace AutoBuilder.Editor
                     var name = process.ProcessName;
                     if ((!string.IsNullOrEmpty(baseName) && name.StartsWith(baseName, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(cleanName) && name.Contains(cleanName, StringComparison.OrdinalIgnoreCase)) ||
-                        name.Contains("PokeFood", StringComparison.OrdinalIgnoreCase) ||
                         name.Equals("WindowsPlayer", StringComparison.OrdinalIgnoreCase))
                     {
                         process.Kill();

@@ -5,12 +5,42 @@ using UnityEngine;
 
 namespace Core.Pooling
 {
+    [DefaultExecutionOrder(-90)]
     [AddComponentMenu("Core/Pool Manager")]
     public class PoolManager : Singleton<PoolManager>
     {
         private readonly Dictionary<int, int> _instanceToPoolKey = new();
         private readonly Dictionary<int, Queue<GameObject>> _poolDictionary = new();
         private readonly Dictionary<int, GameObject> _prefabLookup = new();
+        private readonly Dictionary<int, IPoolable[]> _poolableCache = new();
+
+        public void Prewarm(GameObject prefab, int count)
+        {
+            if (prefab == null || count <= 0)
+            {
+                return;
+            }
+
+            var poolKey = prefab.GetInstanceID();
+            if (!_poolDictionary.TryGetValue(poolKey, out var queue))
+            {
+                queue = new Queue<GameObject>(count);
+                _poolDictionary[poolKey] = queue;
+                _prefabLookup[poolKey] = prefab;
+            }
+
+            while (queue.Count < count)
+            {
+                var instance = Instantiate(prefab, transform);
+                instance.SetActive(false);
+
+                var instanceId = instance.GetInstanceID();
+                _instanceToPoolKey[instanceId] = poolKey;
+                _poolableCache[instanceId] = instance.GetComponentsInChildren<IPoolable>(true);
+
+                queue.Enqueue(instance);
+            }
+        }
 
         public GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent = null)
         {
@@ -21,37 +51,48 @@ namespace Core.Pooling
 
             var poolKey = prefab.GetInstanceID();
 
-            if (!_poolDictionary.ContainsKey(poolKey))
+            if (!_poolDictionary.TryGetValue(poolKey, out var queue))
             {
-                _poolDictionary[poolKey] = new Queue<GameObject>();
+                queue = new Queue<GameObject>();
+                _poolDictionary[poolKey] = queue;
                 _prefabLookup[poolKey] = prefab;
             }
 
-            GameObject instance;
+            GameObject instance = null;
 
-            if (_poolDictionary[poolKey].Count > 0)
+            while (queue.Count > 0 && instance == null)
             {
-                instance = _poolDictionary[poolKey].Dequeue();
-                if (instance == null)
-                {
-                    return Spawn(prefab, position, rotation, parent);
-                }
+                instance = queue.Dequeue();
+            }
+
+            int instanceId;
+            if (instance == null)
+            {
+                instance = Instantiate(prefab);
+                instanceId = instance.GetInstanceID();
+                _instanceToPoolKey[instanceId] = poolKey;
+                _poolableCache[instanceId] = instance.GetComponentsInChildren<IPoolable>(true);
             }
             else
             {
-                instance = Instantiate(prefab);
+                instanceId = instance.GetInstanceID();
+                _instanceToPoolKey[instanceId] = poolKey;
+                if (!_poolableCache.ContainsKey(instanceId))
+                {
+                    _poolableCache[instanceId] = instance.GetComponentsInChildren<IPoolable>(true);
+                }
             }
-
-            _instanceToPoolKey[instance.GetInstanceID()] = poolKey;
 
             instance.transform.SetPositionAndRotation(position, rotation);
             instance.transform.SetParent(parent);
             instance.SetActive(true);
 
-            var poolables = instance.GetComponentsInChildren<IPoolable>(true);
-            foreach (var poolable in poolables)
+            if (_poolableCache.TryGetValue(instanceId, out var poolables))
             {
-                poolable.OnSpawnFromPool();
+                for (var i = 0; i < poolables.Length; i++)
+                {
+                    poolables[i]?.OnSpawnFromPool();
+                }
             }
 
             return instance;
@@ -67,20 +108,26 @@ namespace Core.Pooling
             var instanceId = instance.GetInstanceID();
             if (_instanceToPoolKey.TryGetValue(instanceId, out var poolKey))
             {
-                if (!_poolDictionary.ContainsKey(poolKey))
+                if (!_poolDictionary.TryGetValue(poolKey, out var queue))
                 {
-                    _poolDictionary[poolKey] = new Queue<GameObject>();
+                    queue = new Queue<GameObject>();
+                    _poolDictionary[poolKey] = queue;
                 }
 
-                var poolables = instance.GetComponentsInChildren<IPoolable>(true);
-                foreach (var poolable in poolables)
+                if (!_poolableCache.TryGetValue(instanceId, out var poolables))
                 {
-                    poolable.OnReturnToPool();
+                    poolables = instance.GetComponentsInChildren<IPoolable>(true);
+                    _poolableCache[instanceId] = poolables;
+                }
+
+                for (var i = 0; i < poolables.Length; i++)
+                {
+                    poolables[i]?.OnReturnToPool();
                 }
 
                 instance.SetActive(false);
                 instance.transform.SetParent(transform);
-                _poolDictionary[poolKey].Enqueue(instance);
+                queue.Enqueue(instance);
             }
             else
             {
@@ -98,11 +145,18 @@ namespace Core.Pooling
             if (prefab != null)
             {
                 var poolKey = prefab.GetInstanceID();
-                _instanceToPoolKey[instance.GetInstanceID()] = poolKey;
+                var instanceId = instance.GetInstanceID();
+                _instanceToPoolKey[instanceId] = poolKey;
+
                 if (!_poolDictionary.ContainsKey(poolKey))
                 {
                     _poolDictionary[poolKey] = new Queue<GameObject>();
                     _prefabLookup[poolKey] = prefab;
+                }
+
+                if (!_poolableCache.ContainsKey(instanceId))
+                {
+                    _poolableCache[instanceId] = instance.GetComponentsInChildren<IPoolable>(true);
                 }
             }
 
@@ -110,3 +164,4 @@ namespace Core.Pooling
         }
     }
 }
+

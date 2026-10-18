@@ -6,6 +6,8 @@ namespace AutoBuilder.Editor
     [CreateAssetMenu(fileName = "WebGlConfigSO", menuName = "Auto Builder/WebGlConfigSO")]
     public class WebGlBuildConfigSO : ScriptableObject
     {
+        private const string PentaApiKeyPrefKey = "AutoBuilder_WebGL_PentaApiKey";
+
         [SerializeField] private WebGLCompressionFormat compressionFormat = WebGLCompressionFormat.Gzip;
         [SerializeField] private string templateName = "APPLICATION:Default";
         [SerializeField] private bool autoStartLocalServer = true;
@@ -13,8 +15,7 @@ namespace AutoBuilder.Editor
         [SerializeField] private bool enablePentaDeployment = true;
         [SerializeField] private string pentaProjectPath = "C:/WebProjects/Penta";
         [SerializeField] private string pentaServerUrl = "http://localhost:3000";
-        [SerializeField] private string pentaGameSlug = "totally-normal-meat-co";
-        [SerializeField] private string pentaApiKey = "";
+        [SerializeField] private string pentaGameSlug = "";
         [SerializeField] private string pentaAspectRatio = "16:9";
 
         public WebGLCompressionFormat CompressionFormat
@@ -67,8 +68,8 @@ namespace AutoBuilder.Editor
 
         public string PentaApiKey
         {
-            get => pentaApiKey;
-            set => pentaApiKey = value;
+            get => EditorPrefs.GetString(PentaApiKeyPrefKey, "");
+            set => EditorPrefs.SetString(PentaApiKeyPrefKey, value ?? "");
         }
 
         public string PentaAspectRatio
@@ -78,3 +79,4 @@ namespace AutoBuilder.Editor
         }
     }
 }
+

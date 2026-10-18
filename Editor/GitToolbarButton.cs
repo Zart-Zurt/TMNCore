@@ -41,21 +41,29 @@ namespace Core.Editor
             EnsureToolbarButton();
 
             if (!_isProcessing && EditorApplication.timeSinceStartup - _lastCheckTime > CheckInterval)
+            {
                 _ = CheckGitStatusAsync();
+            }
         }
 
         private static void EnsureToolbarButton()
         {
             if (_toolbarButton != null && _toolbarButton.panel != null)
+            {
                 return;
+            }
 
             var toolbarType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.Toolbar");
             if (toolbarType == null)
+            {
                 return;
+            }
 
             var toolbars = Resources.FindObjectsOfTypeAll(toolbarType);
             if (toolbars.Length == 0)
+            {
                 return;
+            }
 
             var toolbar = toolbars[0];
             var root = toolbar.GetType().GetField("m_Root", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(toolbar) as VisualElement;
@@ -64,11 +72,15 @@ namespace Core.Editor
             {
                 var property = toolbarType.GetProperty("viewVisualTree", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 if (property != null)
+                {
                     root = property.GetValue(toolbar) as VisualElement;
+                }
             }
 
             if (root == null)
+            {
                 return;
+            }
 
             var container = root.Q("ToolbarZoneRightAlign") ?? root.Q("unity-toolbar-right") ?? root;
 
@@ -87,24 +99,34 @@ namespace Core.Editor
             }
 
             if (!container.Contains(_toolbarButton))
+            {
                 container.Add(_toolbarButton);
+            }
         }
 
         private static void OnBoxClicked()
         {
             if (_isProcessing)
+            {
                 return;
+            }
 
             if (_commitsBehind > 0)
+            {
                 _ = PullGitAsync();
+            }
             else
+            {
                 _ = CheckGitStatusAsync();
+            }
         }
 
         private static async Task CheckGitStatusAsync()
         {
             if (_isProcessing)
+            {
                 return;
+            }
 
             _isProcessing = true;
             _lastCheckTime = EditorApplication.timeSinceStartup;
@@ -125,12 +147,18 @@ namespace Core.Editor
             var result = await RunGitCommandAsync($"rev-list --right-only --count HEAD...origin/{_currentBranch}");
 
             if (int.TryParse(result?.Trim() ?? "0", out var count))
+            {
                 _commitsBehind = count;
+            }
 
             if (_commitsBehind > 0)
+            {
                 UpdateButtonUI($"Pull ({_commitsBehind})", $"{_commitsBehind} new commits on {_currentBranch}.");
+            }
             else
+            {
                 UpdateButtonUI($"{_currentBranch}", "Repository is up to date.");
+            }
 
             _isProcessing = false;
         }
@@ -175,12 +203,16 @@ namespace Core.Editor
             process.OutputDataReceived += (_, e) =>
             {
                 if (e.Data != null)
+                {
                     output += e.Data + "\n";
+                }
             };
             process.ErrorDataReceived += (_, e) =>
             {
                 if (e.Data != null)
+                {
                     output += e.Data + "\n";
+                }
             };
             process.Exited += (_, _) =>
             {

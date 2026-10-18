@@ -1,7 +1,6 @@
 using System.Linq;
 using UnityEngine;
 
-//Use On Inspector
 namespace Core.Utils
 {
     public class SetLayersOnInspector : MonoBehaviour
@@ -19,15 +18,22 @@ namespace Core.Utils
             foreach (var item in list)
             {
                 if (changeLayer)
+                {
                     item.SetSortingLayerByIndex(SortingLayer.GetLayerValueFromID(sortingLayer) + 6);
+                }
+
                 if (changeOrder)
+                {
                     item.SetOrderInLayerByNum(sortingOrder);
+                }
             }
-            
+
 #if UNITY_EDITOR
             if (!Application.isPlaying)
+            {
                 UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+            }
 #endif
         }
     }
-}
+}

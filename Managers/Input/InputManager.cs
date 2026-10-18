@@ -8,6 +8,7 @@ using UnityEngine.InputSystem;
 
 namespace Core.Inputs
 {
+    [DefaultExecutionOrder(-90)]
     [AddComponentMenu("Core/Input/Input Manager")]
     public class InputManager : Singleton<InputManager>
     {
@@ -57,8 +58,9 @@ namespace Core.Inputs
             InputSystem.onActionChange += OnActionChange;
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             InputSystem.onActionChange -= OnActionChange;
 
             if (_rebindingOperation != null)
@@ -187,7 +189,15 @@ namespace Core.Inputs
 
             var json = inputActions.SaveBindingOverridesAsJson();
             var path = Path.Combine(Application.persistentDataPath, "input_bindings.json");
-            File.WriteAllText(path, json);
+            var tempPath = path + ".tmp";
+            File.WriteAllText(tempPath, json);
+
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
+            File.Move(tempPath, path);
         }
 
         public void LoadBindingOverridesFromFile()

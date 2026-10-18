@@ -9,11 +9,11 @@ Unity mobil ve PC projeleri için paylaşımlı temel mimari, yönetici sınıfl
 2. Sol üstteki **`+`** butonuna tıklayın ve **"Add package from git URL..."** seçeneğini seçin.
 3. Aşağıdaki URL'yi yapıştırın:
    ```text
-   https://github.com/Zart-Zurt/TMN-Core.git
+   https://github.com/Zart-Zurt/TMNCore.git
    ```
 4. Belirli bir sürümü sabitlemek isterseniz sürüm etiketini ekleyebilirsiniz:
    ```text
-   https://github.com/Zart-Zurt/TMN-Core.git#v1.0.0
+   https://github.com/Zart-Zurt/TMNCore.git#v1.1.0
    ```
 
 ### `Packages/manifest.json` Üzerinden Kurulum
@@ -21,7 +21,7 @@ Projenizin `Packages/manifest.json` dosyasına doğrudan bağımlılık olarak e
 ```json
 {
   "dependencies": {
-    "com.tmn.core": "https://github.com/Zart-Zurt/TMN-Core.git",
+    "com.tmn.core": "https://github.com/Zart-Zurt/TMNCore.git",
     ...
   }
 }

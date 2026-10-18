@@ -304,7 +304,7 @@ namespace AutoBuilder.Editor
                 if (process.ExitCode == 0)
                 {
                     Debug.Log($"[GitHub Pages Deploy] {output}");
-                    EditorUtility.DisplayDialog("Success", "WebGL build was successfully pushed to 'gh-pages' branch!\n\nGitHub Pages URL:\nhttps://zart-zurt.github.io/PiggySmash/", "OK");
+                    EditorUtility.DisplayDialog("Success", $"WebGL build for '{Application.productName}' was successfully pushed to 'gh-pages' branch!", "OK");
                 }
                 else
                 {

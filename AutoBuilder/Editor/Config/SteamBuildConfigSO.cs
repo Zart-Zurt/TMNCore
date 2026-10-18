@@ -1,3 +1,4 @@
+using UnityEditor;
 using UnityEngine;
 
 namespace AutoBuilder.Editor
@@ -13,6 +14,8 @@ namespace AutoBuilder.Editor
     [CreateAssetMenu(fileName = "SteamConfigSO", menuName = "Auto Builder/SteamConfigSO")]
     public class SteamBuildConfigSO : ScriptableObject
     {
+        private const string SteamPasswordPrefKey = "AutoBuilder_Steam_Password";
+
         [SerializeField] private SteamSubPlatform subPlatform = SteamSubPlatform.Local;
         [SerializeField] private bool autoZip = true;
         [SerializeField] private bool autoRun = true;
@@ -20,7 +23,6 @@ namespace AutoBuilder.Editor
         [SerializeField] private string steamPlaytestSdkPath = "";
         [SerializeField] private string steamSdkPath = "";
         [SerializeField] private string steamUsername = "";
-        [SerializeField] private string steamPassword = "";
         [SerializeField] private uint steamDemoAppId = 4734900u;
         [SerializeField] private uint steamPlaytestAppId = 4734920u;
         [SerializeField] private uint steamAppId = 4593660u;
@@ -71,8 +73,8 @@ namespace AutoBuilder.Editor
 
         public string SteamPassword
         {
-            get => steamPassword;
-            set => steamPassword = value;
+            get => EditorPrefs.GetString(SteamPasswordPrefKey, "");
+            set => EditorPrefs.SetString(SteamPasswordPrefKey, value ?? "");
         }
 
         public uint SteamDemoAppId
@@ -106,3 +108,4 @@ namespace AutoBuilder.Editor
         }
     }
 }
+

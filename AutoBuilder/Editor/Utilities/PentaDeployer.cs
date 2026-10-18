@@ -17,7 +17,10 @@ namespace AutoBuilder.Editor
             }
 
             var cleanVersion = version.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? version : $"v{version}";
-            var slug = string.IsNullOrEmpty(config.PentaGameSlug) ? "totally-normal-meat-co" : config.PentaGameSlug;
+            var defaultSlug = string.IsNullOrWhiteSpace(Application.productName)
+                ? "game"
+                : Application.productName.Trim().ToLowerInvariant().Replace(" ", "-");
+            var slug = string.IsNullOrEmpty(config.PentaGameSlug) ? defaultSlug : config.PentaGameSlug;
             var targetParent = Path.Combine(config.PentaProjectPath, "public", "prototypes", slug, cleanVersion);
 
             try

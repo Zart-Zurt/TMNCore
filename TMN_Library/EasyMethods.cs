@@ -29,12 +29,21 @@ namespace Core.Utils
             }
 
             if (closest == null)
+            {
                 return null;
+            }
+
             if (typeof(T) == typeof(GameObject))
+            {
                 return closest as T;
+            }
+
             if (typeof(T) == typeof(Transform))
+            {
                 return closest.transform as T;
-            return closest as T;
+            }
+
+            return closest.GetComponent<T>();
         }
 
         public static Transform FindClosestObject(List<GameObject> allObjects, Vector3 pos)
@@ -75,7 +84,7 @@ namespace Core.Utils
         {
             var allObjects = GameObject.FindGameObjectsWithTag(tag);
             GameObject closest = null;
-            var distance = range;
+            var distance = range * range;
             foreach (var go in allObjects)
             {
                 var curDistance = (go.transform.position - pos).sqrMagnitude;
@@ -92,45 +101,75 @@ namespace Core.Utils
         public static void CloseOpenAllList(List<GameObject> list, bool situation)
         {
             if (list == null)
+            {
                 return;
+            }
+
             foreach (var item in list)
+            {
                 if (item != null)
+                {
                     item.SetActive(situation);
+                }
+            }
         }
 
         public static void EnableAllList(List<MeshRenderer> list, bool situation)
         {
             if (list == null)
+            {
                 return;
+            }
+
             foreach (var item in list)
-                item.enabled = situation;
+            {
+                if (item != null)
+                {
+                    item.enabled = situation;
+                }
+            }
         }
 
         public static void EnableAllList(List<SkinnedMeshRenderer> list, bool situation)
         {
             if (list == null)
+            {
                 return;
+            }
+
             foreach (var item in list)
+            {
                 if (item != null)
+                {
                     item.enabled = situation;
+                }
+            }
         }
 
         public static void EnableAllList(List<Collider> list, bool situation)
         {
             if (list == null)
+            {
                 return;
+            }
+
             foreach (var item in list)
-                item.enabled = situation;
+            {
+                if (item != null)
+                {
+                    item.enabled = situation;
+                }
+            }
         }
 
         public static bool IsIndexInList<T>(List<T> list, int index)
         {
-            return list.Count > index && index >= 0;
+            return list != null && list.Count > index && index >= 0;
         }
-        
+
         public static bool IsThisIndexInList<T>(this List<T> list, int index)
         {
-            return list.Count > index && index >= 0;
+            return list != null && list.Count > index && index >= 0;
         }
 
         public static string MoneyTextConverter(int moneyAmount)
@@ -139,35 +178,37 @@ namespace Core.Utils
             switch (moneyAmount)
             {
                 case >= 1000000000:
-                    {
-                        var amount = moneyAmount / 1000000000f;
-                        amount = (float)Math.Round(amount, 1);
-                        text = amount.ToString();
-                        text = ChangeCharFormString(text, ",", ".");
-                        text += "B";
-                        break;
-                    }
+                {
+                    var amount = moneyAmount / 1000000000f;
+                    amount = (float)Math.Round(amount, 1);
+                    text = amount.ToString();
+                    text = ChangeCharFormString(text, ",", ".");
+                    text += "B";
+                    break;
+                }
                 case >= 1000000:
-                    {
-                        var amount = moneyAmount / 1000000f;
-                        amount = (float)Math.Round(amount, 1);
-                        text = amount.ToString();
-                        text = ChangeCharFormString(text, ",", ".");
-                        text += "M";
-                        break;
-                    }
+                {
+                    var amount = moneyAmount / 1000000f;
+                    amount = (float)Math.Round(amount, 1);
+                    text = amount.ToString();
+                    text = ChangeCharFormString(text, ",", ".");
+                    text += "M";
+                    break;
+                }
                 case >= 1000:
-                    {
-                        var amount = moneyAmount / 1000f;
-                        amount = (float)Math.Round(amount, 1);
-                        text = amount.ToString();
-                        text = ChangeCharFormString(text, ",", ".");
-                        text += "K";
-                        break;
-                    }
+                {
+                    var amount = moneyAmount / 1000f;
+                    amount = (float)Math.Round(amount, 1);
+                    text = amount.ToString();
+                    text = ChangeCharFormString(text, ",", ".");
+                    text += "K";
+                    break;
+                }
                 default:
+                {
                     text = moneyAmount.ToString();
                     break;
+                }
             }
 
             return text;
@@ -187,62 +228,46 @@ namespace Core.Utils
 
         public static List<T> ShuffleList<T>(this List<T> list)
         {
-            var temp = new List<T>();
-            var shuffled = new List<T>();
-            temp.AddRange(list);
-
-            for (var i = 0; i < list.Count; i++)
+            if (list == null)
             {
-                var index = UnityEngine.Random.Range(0, temp.Count - 1);
-                shuffled.Add(temp[index]);
-                temp.RemoveAt(index);
+                return null;
             }
 
-            return shuffled;
+            for (var i = list.Count - 1; i > 0; i--)
+            {
+                var index = UnityEngine.Random.Range(0, i + 1);
+                (list[i], list[index]) = (list[index], list[i]);
+            }
+
+            return list;
         }
 
         public static void ChangeAlpha(this SpriteRenderer item, float alpha)
         {
-            var color =  item.color;
+            var color = item.color;
             color.a = alpha;
             item.color = color;
         }
-        
+
         public static void ChangeAlpha(this MeshRenderer item, float alpha)
         {
-            var color =  item.material.color;
+            var color = item.material.color;
             color.a = alpha;
             item.material.color = color;
         }
-        
+
         public static void ChangeAlpha(this Material item, float alpha)
         {
-            var color =  item.color;
+            var color = item.color;
             color.a = alpha;
             item.color = color;
         }
-        
+
         public static void ChangeAlpha(this Image item, float alpha)
         {
-            var color =  item.color;
+            var color = item.color;
             color.a = alpha;
             item.color = color;
         }
     }
-}
-
-namespace TMNLib
-{
-    public static class EasyMethods
-    {
-        public static bool IsEqualV3(Vector3 v1, Vector3 v2, float minDistance)
-        {
-            return Core.Utils.EasyMethods.IsEqualV3(v1, v2, minDistance);
-        }
-
-        public static string MoneyTextConverter(int moneyAmount)
-        {
-            return Core.Utils.EasyMethods.MoneyTextConverter(moneyAmount);
-        }
-    }
-}
+}

@@ -84,7 +84,7 @@ namespace AutoBuilder.Editor
             {
                 try
                 {
-                    _serverThread.Abort();
+                    _serverThread.Join(500);
                 }
                 catch
                 {

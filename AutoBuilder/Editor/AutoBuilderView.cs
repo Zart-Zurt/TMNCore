@@ -361,7 +361,7 @@ namespace AutoBuilder.Editor
             }
             else
             {
-                _context.BaseName = EditorPrefs.GetString("AutoBuilder_BaseName", "TotallyNormalMeatCo");
+                _context.BaseName = EditorPrefs.GetString("AutoBuilder_BaseName", Application.productName);
                 _context.Version = PlayerSettings.bundleVersion;
             }
 

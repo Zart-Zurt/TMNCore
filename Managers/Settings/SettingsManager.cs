@@ -8,6 +8,7 @@ using UnityEngine.Audio;
 
 namespace Core.Settings
 {
+    [DefaultExecutionOrder(-95)]
     [AddComponentMenu("Core/Settings/Settings Manager")]
     public class SettingsManager : Singleton<SettingsManager>
     {
@@ -29,7 +30,15 @@ namespace Core.Settings
 
             var json = JsonUtility.ToJson(data, true);
             var path = Path.Combine(Application.persistentDataPath, "game_settings.json");
-            File.WriteAllText(path, json);
+            var tempPath = path + ".tmp";
+            File.WriteAllText(tempPath, json);
+
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
+            File.Move(tempPath, path);
 
             EventBus.Raise(new SettingsChangedEvent { settings = data });
         }
