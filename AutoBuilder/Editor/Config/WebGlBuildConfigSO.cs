@@ -8,15 +8,16 @@ namespace AutoBuilder.Editor
     {
         private const string PentaApiKeyPrefKey = "AutoBuilder_WebGL_PentaApiKey";
 
-        [SerializeField] private WebGLCompressionFormat compressionFormat = WebGLCompressionFormat.Gzip;
+        [SerializeField] private WebGLCompressionFormat compressionFormat = WebGLCompressionFormat.Disabled;
         [SerializeField] private string templateName = "APPLICATION:Default";
-        [SerializeField] private bool autoStartLocalServer = true;
+        [SerializeField] private bool autoStartLocalServer;
         [SerializeField] private int localServerPort = 8080;
         [SerializeField] private bool enablePentaDeployment = true;
         [SerializeField] private string pentaProjectPath = "C:/WebProjects/Penta";
-        [SerializeField] private string pentaServerUrl = "http://localhost:3000";
+        [SerializeField] private string pentaServerUrl = "https://penta.zart-zurt.com";
         [SerializeField] private string pentaGameSlug = "";
-        [SerializeField] private string pentaAspectRatio = "16:9";
+        [SerializeField] private string pentaAspectRatio = "9:16";
+        [SerializeField] private bool syncRemoteVps = true;
 
         public WebGLCompressionFormat CompressionFormat
         {
@@ -77,6 +78,61 @@ namespace AutoBuilder.Editor
             get => pentaAspectRatio;
             set => pentaAspectRatio = value;
         }
+
+        public bool SyncRemoteVps
+        {
+            get => syncRemoteVps;
+            set => syncRemoteVps = value;
+        }
+
+        public string GetEffectiveServerUrl()
+        {
+            if (!string.IsNullOrEmpty(pentaServerUrl))
+            {
+                return pentaServerUrl.TrimEnd('/');
+            }
+
+            var fromSettings = PentaSettingsReader.GetServerUrl();
+            if (!string.IsNullOrEmpty(fromSettings))
+            {
+                return fromSettings;
+            }
+
+            return "https://penta.zart-zurt.com";
+        }
+
+        public string GetEffectiveGameSlug()
+        {
+            if (!string.IsNullOrEmpty(pentaGameSlug))
+            {
+                return pentaGameSlug.Trim();
+            }
+
+            var fromSettings = PentaSettingsReader.GetGameId();
+            if (!string.IsNullOrEmpty(fromSettings))
+            {
+                return fromSettings;
+            }
+
+            return string.IsNullOrWhiteSpace(Application.productName)
+                ? "game"
+                : Application.productName.Trim().ToLowerInvariant().Replace(" ", "-");
+        }
+
+        public string GetEffectiveApiKey()
+        {
+            var storedKey = PentaApiKey;
+            if (!string.IsNullOrEmpty(storedKey))
+            {
+                return storedKey;
+            }
+
+            return PentaSettingsReader.GetApiKey();
+        }
+
+        public string GetEffectiveAspectRatio()
+        {
+            return string.IsNullOrEmpty(pentaAspectRatio) ? "9:16" : pentaAspectRatio.Trim();
+        }
     }
 }
-

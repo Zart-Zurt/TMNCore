@@ -36,6 +36,54 @@ namespace AutoBuilder.Editor
             _config.TemplateName = EditorGUILayout.TextField("WebGL Template", _config.TemplateName);
 
             EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Penta Studio WebGL Integration", EditorStyles.boldLabel);
+            _config.EnablePentaDeployment = EditorGUILayout.Toggle("Deploy to Penta", _config.EnablePentaDeployment);
+
+            if (_config.EnablePentaDeployment)
+            {
+                EditorGUILayout.BeginHorizontal();
+                _config.PentaProjectPath = EditorGUILayout.TextField("Penta Project Path", _config.PentaProjectPath);
+                if (GUILayout.Button("Browse", GUILayout.Width(70)))
+                {
+                    var selected = EditorUtility.OpenFolderPanel("Select Penta Project Root", _config.PentaProjectPath, "");
+                    if (!string.IsNullOrEmpty(selected))
+                    {
+                        _config.PentaProjectPath = selected;
+                    }
+                }
+                EditorGUILayout.EndHorizontal();
+
+                _config.PentaServerUrl = EditorGUILayout.TextField("Penta Server URL", _config.PentaServerUrl);
+                _config.PentaGameSlug = EditorGUILayout.TextField("Game Slug", _config.PentaGameSlug);
+                _config.PentaApiKey = EditorGUILayout.PasswordField("API Key", _config.PentaApiKey);
+                _config.PentaAspectRatio = EditorGUILayout.TextField("Aspect Ratio", _config.PentaAspectRatio);
+                _config.SyncRemoteVps = EditorGUILayout.Toggle("Sync to Live VPS", _config.SyncRemoteVps);
+
+                EditorGUILayout.Space(2);
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Deploy Last Build to Penta", GUILayout.Height(28)))
+                {
+                    var folder = GetLastBuildFolder();
+                    if (Directory.Exists(folder))
+                    {
+                        _ = PentaDeployer.DeployToPentaAsync(folder, _config, _context.BaseName, _context.Version);
+                    }
+                    else
+                    {
+                        EditorUtility.DisplayDialog("Error", $"Build folder not found: {folder}", "OK");
+                    }
+                }
+
+                if (GUILayout.Button("Open Penta Web Player", GUILayout.Height(28)))
+                {
+                    var effectiveServerUrl = _config.GetEffectiveServerUrl();
+                    var effectiveSlug = _config.GetEffectiveGameSlug();
+                    Application.OpenURL($"{effectiveServerUrl}/games/{effectiveSlug}/webgl");
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.Space();
             EditorGUILayout.LabelField("Local Test Server (Embedded)", EditorStyles.boldLabel);
             _config.AutoStartLocalServer = EditorGUILayout.Toggle("Auto Start Local Server", _config.AutoStartLocalServer);
             _config.LocalServerPort = EditorGUILayout.IntField("Local Server Port", _config.LocalServerPort);
@@ -73,60 +121,6 @@ namespace AutoBuilder.Editor
                 GUI.backgroundColor = Color.white;
             }
             EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Penta Studio WebGL Integration", EditorStyles.boldLabel);
-            _config.EnablePentaDeployment = EditorGUILayout.Toggle("Deploy to Penta", _config.EnablePentaDeployment);
-
-            if (_config.EnablePentaDeployment)
-            {
-                EditorGUILayout.BeginHorizontal();
-                _config.PentaProjectPath = EditorGUILayout.TextField("Penta Project Path", _config.PentaProjectPath);
-                if (GUILayout.Button("Browse", GUILayout.Width(70)))
-                {
-                    var selected = EditorUtility.OpenFolderPanel("Select Penta Project Root", _config.PentaProjectPath, "");
-                    if (!string.IsNullOrEmpty(selected))
-                    {
-                        _config.PentaProjectPath = selected;
-                    }
-                }
-                EditorGUILayout.EndHorizontal();
-
-                _config.PentaServerUrl = EditorGUILayout.TextField("Penta Server URL", _config.PentaServerUrl);
-                _config.PentaGameSlug = EditorGUILayout.TextField("Game Slug", _config.PentaGameSlug);
-                _config.PentaApiKey = EditorGUILayout.PasswordField("API Key", _config.PentaApiKey);
-                _config.PentaAspectRatio = EditorGUILayout.TextField("Aspect Ratio", _config.PentaAspectRatio);
-
-                if (GUILayout.Button("Deploy Last Build to Penta Now", GUILayout.Height(26)))
-                {
-                    var folder = GetLastBuildFolder();
-                    if (Directory.Exists(folder))
-                    {
-                        _ = PentaDeployer.DeployToPentaAsync(folder, _config, _context.BaseName, _context.Version);
-                    }
-                    else
-                    {
-                        EditorUtility.DisplayDialog("Error", $"Build folder not found: {folder}", "OK");
-                    }
-                }
-            }
-            else
-            {
-                EditorGUILayout.HelpBox(
-                    "GitHub Pages Dağıtımı (İlk Kurulum):\nGitHub reposunda bir kerelik 'Settings > Pages' bölümüne gidip Branch olarak 'gh-pages' / '/ (root)' seçilmeli ve Save denilmelidir. Ardından build çıktısını bu branch'e push ederek Penta'ya URL olarak bağlayabilirsiniz.",
-                    MessageType.Info);
-
-                var folder = GetLastBuildFolder();
-                if (Directory.Exists(folder))
-                {
-                    GUI.backgroundColor = new Color(0.2f, 0.7f, 1f);
-                    if (GUILayout.Button("Deploy Last Build to GitHub Pages Now", GUILayout.Height(30)))
-                    {
-                        DeployToGitHubPagesDirectly();
-                    }
-                    GUI.backgroundColor = Color.white;
-                }
-            }
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Version & Output Info", EditorStyles.boldLabel);
@@ -258,65 +252,6 @@ namespace AutoBuilder.Editor
                 AssetDatabase.CreateAsset(_config, assetPath);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
-            }
-        }
-
-        private void DeployToGitHubPagesDirectly()
-        {
-            var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            var scriptPath = Path.Combine(projectRoot, "Deploy-WebGl-To-GitHubPages.ps1");
-
-            if (!File.Exists(scriptPath))
-            {
-                EditorUtility.DisplayDialog("Script Missing", "Deploy-WebGl-To-GitHubPages.ps1 not found in project root.", "OK");
-                return;
-            }
-
-            var startInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"",
-                WorkingDirectory = projectRoot,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-
-            EditorUtility.DisplayProgressBar("Deploying to GitHub Pages", "Pushing WebGL build to gh-pages branch...", 0.5f);
-
-            try
-            {
-                using var process = System.Diagnostics.Process.Start(startInfo);
-                if (process == null)
-                {
-                    EditorUtility.ClearProgressBar();
-                    EditorUtility.DisplayDialog("Error", "Could not start PowerShell process.", "OK");
-                    return;
-                }
-
-                var output = process.StandardOutput.ReadToEnd();
-                var error = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-
-                EditorUtility.ClearProgressBar();
-
-                if (process.ExitCode == 0)
-                {
-                    Debug.Log($"[GitHub Pages Deploy] {output}");
-                    EditorUtility.DisplayDialog("Success", $"WebGL build for '{Application.productName}' was successfully pushed to 'gh-pages' branch!", "OK");
-                }
-                else
-                {
-                    Debug.LogError($"[GitHub Pages Deploy Error] {error}\n{output}");
-                    EditorUtility.DisplayDialog("Deployment Failed", error, "OK");
-                }
-            }
-            catch (System.Exception ex)
-            {
-                EditorUtility.ClearProgressBar();
-                Debug.LogError($"[GitHub Pages Deploy Exception] {ex.Message}");
-                EditorUtility.DisplayDialog("Error", ex.Message, "OK");
             }
         }
     }
