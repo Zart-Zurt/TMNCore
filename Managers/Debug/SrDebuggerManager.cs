@@ -132,6 +132,7 @@ namespace Core.Debugging
 
         public void ToggleDebugPanel()
         {
+#if !DISABLE_SRDEBUGGER
             if (SRDebug.Instance == null)
             {
                 return;
@@ -145,6 +146,7 @@ namespace Core.Debugging
             {
                 SRDebug.Instance.ShowDebugPanel();
             }
+#endif
         }
     }
 }
