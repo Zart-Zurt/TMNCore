@@ -310,7 +310,7 @@ namespace AutoBuilder.Editor
 
             if (_config == null)
             {
-                var folder = "Assets/Plugins/TMN/AutoBuilder/Data";
+                var folder = "Assets/_GAME/Data";
                 if (!Directory.Exists(folder))
                 {
                     Directory.CreateDirectory(folder);

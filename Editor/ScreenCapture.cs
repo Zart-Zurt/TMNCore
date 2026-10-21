@@ -7,6 +7,7 @@ namespace Core.Editor
 {
     public class EditorScreenCapture : EditorWindow
     {
+        [MenuItem("ZZEngine/ScreenShot")]
         [MenuItem("Tools/Capture Screenshot")]
         private static void Capture()
         {
@@ -23,4 +24,4 @@ namespace Core.Editor
             EditorUtility.RevealInFinder(filename);
         }
     }
-}
+}
