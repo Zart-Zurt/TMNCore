@@ -140,27 +140,44 @@ namespace AutoBuilder.Editor
                 httpClient.DefaultRequestHeaders.Add("x-penta-api-key", apiKey);
             }
 
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            try
+            const int maxRetries = 3;
+            for (var attempt = 1; attempt <= maxRetries; attempt++)
             {
-                var response = await httpClient.PostAsync(endpoint, content);
-                var responseBody = await response.Content.ReadAsStringAsync();
-
-                if (response.IsSuccessStatusCode)
+                try
                 {
-                    Debug.Log($"[AutoBuilder Penta] Successfully registered WebGL build in Penta API: {responseBody}");
-                    return true;
-                }
+                    using var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    var response = await httpClient.PostAsync(endpoint, content);
+                    var responseBody = await response.Content.ReadAsStringAsync();
 
-                Debug.LogWarning($"[AutoBuilder Penta] API registration returned [{(int)response.StatusCode}]: {responseBody}");
-                return false;
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Debug.Log($"[AutoBuilder Penta] Successfully registered WebGL build in Penta API: {responseBody}");
+                        return true;
+                    }
+
+                    if ((int)response.StatusCode >= 500 && attempt < maxRetries)
+                    {
+                        Debug.LogWarning($"[AutoBuilder Penta] API registration returned [{(int)response.StatusCode}], retrying ({attempt}/{maxRetries})...");
+                        await Task.Delay(2000 * attempt);
+                        continue;
+                    }
+
+                    Debug.LogWarning($"[AutoBuilder Penta] API registration returned [{(int)response.StatusCode}]: {responseBody}");
+                    return false;
+                }
+                catch (Exception exception) when (attempt < maxRetries)
+                {
+                    Debug.LogWarning($"[AutoBuilder Penta] Request failed on attempt {attempt}: {exception.Message}. Retrying...");
+                    await Task.Delay(2000 * attempt);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning($"[AutoBuilder Penta] Could not reach Penta API at {endpoint}: {exception.Message}. WebGL files remain in prototypes folder.");
+                    return false;
+                }
             }
-            catch (Exception exception)
-            {
-                Debug.LogWarning($"[AutoBuilder Penta] Could not reach Penta API at {endpoint}: {exception.Message}. WebGL files remain in prototypes folder.");
-                return false;
-            }
+
+            return false;
         }
     }
 }
