@@ -109,7 +109,16 @@ namespace AutoBuilder.Editor
                 }
             }
 
+            EditorGUILayout.BeginHorizontal();
             _autoIncrementVersion = EditorGUILayout.Toggle("Auto Increment Version", _autoIncrementVersion);
+            if (_autoIncrementVersion)
+            {
+                var nextVersion = GetIncrementedVersion(_context.Version);
+                EditorGUI.BeginDisabledGroup(true);
+                EditorGUILayout.LabelField($"Next Build: {nextVersion}", EditorStyles.boldLabel);
+                EditorGUI.EndDisabledGroup();
+            }
+            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Global Defines", EditorStyles.boldLabel);
@@ -321,14 +330,30 @@ namespace AutoBuilder.Editor
             view.ExecuteBuild();
         }
 
-        private void IncrementVersion()
+        private string GetIncrementedVersion(string currentVersion)
         {
-            var match = Regex.Match(_context.Version, @"(\d+)(?!.*\d)");
+            if (string.IsNullOrEmpty(currentVersion))
+            {
+                return currentVersion;
+            }
+
+            var match = Regex.Match(currentVersion, @"(\d+)(?!.*\d)");
             if (match.Success)
             {
                 var num = int.Parse(match.Value);
                 num++;
-                _context.Version = _context.Version.Remove(match.Index, match.Length).Insert(match.Index, num.ToString());
+                return currentVersion.Remove(match.Index, match.Length).Insert(match.Index, num.ToString());
+            }
+
+            return currentVersion;
+        }
+
+        private void IncrementVersion()
+        {
+            var nextVersion = GetIncrementedVersion(_context.Version);
+            if (nextVersion != _context.Version)
+            {
+                _context.Version = nextVersion;
                 PlayerSettings.bundleVersion = _context.Version;
 
                 if (_versionData != null)
