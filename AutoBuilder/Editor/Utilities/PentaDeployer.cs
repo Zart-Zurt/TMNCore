@@ -34,7 +34,8 @@ namespace AutoBuilder.Editor
                 var sshSynced = SyncToRemoteVpsViaSsh(webGlBuildFolder, slug, cleanVersion, config);
                 if (!sshSynced)
                 {
-                    Debug.LogWarning("[AutoBuilder Penta] SSH sync could not be completed. Will attempt API registration anyway.");
+                    Debug.LogError("[AutoBuilder Penta] SSH sync could not be completed. Aborting deployment.");
+                    return false;
                 }
 
                 var relativeUrl = $"/prototypes/{slug}/{cleanVersion}/index.html";
@@ -79,17 +80,25 @@ namespace AutoBuilder.Editor
                 return false;
             }
 
+            var nodeExecutable = ResolveNodeExecutable();
+            if (string.IsNullOrEmpty(nodeExecutable))
+            {
+                Debug.LogError("[AutoBuilder Penta] Node.js executable could not be found! Please install Node.js (https://nodejs.org) on this machine.");
+                return false;
+            }
+
             var host = config.GetEffectiveSshHost();
             var port = config.GetEffectiveSshPort();
             var username = config.GetEffectiveSshUsername();
             var password = config.SshPassword;
             var remoteBasePath = config.GetEffectiveSshRemotePath();
 
+            Debug.Log($"[AutoBuilder Penta] Using Node.js at: {nodeExecutable}");
             Debug.Log($"[AutoBuilder Penta] Uploading build to VPS via SSH ({username}@{host}:{port})...");
 
             var arguments = $"\"{syncScriptPath}\" \"{webGlBuildFolder}\" \"{slug}\" \"{cleanVersion}\" \"{host}\" \"{port}\" \"{username}\" \"{password}\" \"{remoteBasePath}\"";
             var workingDir = Path.GetDirectoryName(syncScriptPath);
-            var exitCode = ProcessRunner.Run("node.exe", arguments, workingDir, true);
+            var exitCode = ProcessRunner.Run(nodeExecutable, arguments, workingDir, true);
 
             if (exitCode == 0)
             {
@@ -99,6 +108,50 @@ namespace AutoBuilder.Editor
 
             Debug.LogError($"[AutoBuilder Penta] SSH deployment failed with exit code: {exitCode}");
             return false;
+        }
+
+        private static string ResolveNodeExecutable()
+        {
+            var systemPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            var pathParts = systemPath.Split(Path.PathSeparator);
+
+            foreach (var part in pathParts)
+            {
+                if (string.IsNullOrWhiteSpace(part))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var candidate = Path.Combine(part.Trim(), "node.exe");
+                    if (File.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            var programFilesNode = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe");
+            if (File.Exists(programFilesNode))
+            {
+                return programFilesNode;
+            }
+
+            var unityEditorDir = Path.GetDirectoryName(EditorApplication.applicationPath);
+            if (!string.IsNullOrEmpty(unityEditorDir))
+            {
+                var unityNode = Path.Combine(unityEditorDir, "Data", "PlaybackEngines", "WebGLSupport", "BuildTools", "Emscripten", "node", "node.exe");
+                if (File.Exists(unityNode))
+                {
+                    return unityNode;
+                }
+            }
+
+            return "node.exe";
         }
 
         private static string ResolveSshSyncScriptPath()
