@@ -10,7 +10,7 @@ namespace AutoBuilder.Editor
         private const string SshPasswordPrefKey = "AutoBuilder_WebGL_SshPassword";
 
         [SerializeField] private WebGLCompressionFormat compressionFormat = WebGLCompressionFormat.Disabled;
-        [SerializeField] private string templateName = "APPLICATION:Default";
+        [SerializeField] private string templateName = "PROJECT:PentaWebGL";
         [SerializeField] private bool autoStartLocalServer;
         [SerializeField] private int localServerPort = 8080;
         [SerializeField] private bool enablePentaDeployment = true;

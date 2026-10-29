@@ -142,12 +142,44 @@ namespace AutoBuilder.Editor
             _context = context;
             SaveSettings();
 
+            EnsurePentaWebGLTemplateInstalled();
+
             ScriptingDefinesManager.ApplyCommonDefines(TargetGroup, context.EnableCheats, context.DisableRemoteData, "WEBGL_BUILD");
 
             PlayerSettings.WebGL.compressionFormat = _config.CompressionFormat;
             if (!string.IsNullOrEmpty(_config.TemplateName))
             {
                 PlayerSettings.WebGL.template = _config.TemplateName;
+            }
+        }
+
+        private static void EnsurePentaWebGLTemplateInstalled()
+        {
+            try
+            {
+                var targetDir = Path.Combine(Application.dataPath, "WebGLTemplates", "PentaWebGL");
+                if (Directory.Exists(targetDir) && File.Exists(Path.Combine(targetDir, "index.html")))
+                {
+                    return;
+                }
+
+                var packageSource = Path.Combine(Application.dataPath, "..", "Packages", "com.tmn.core", "AutoBuilder", "WebGLTemplates", "PentaWebGL");
+                if (!Directory.Exists(packageSource))
+                {
+                    packageSource = Path.Combine("C:", "UnityWorks", "TMN", "TMNCore", "AutoBuilder", "WebGLTemplates", "PentaWebGL");
+                }
+
+                if (Directory.Exists(packageSource))
+                {
+                    Directory.CreateDirectory(targetDir);
+                    ProcessRunner.CopyDirectory(packageSource, targetDir);
+                    AssetDatabase.Refresh();
+                    Debug.Log("[AutoBuilder] Automatically installed PentaWebGL template to Assets/WebGLTemplates/PentaWebGL.");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[AutoBuilder] Could not auto-install PentaWebGL template: {ex.Message}");
             }
         }
 
