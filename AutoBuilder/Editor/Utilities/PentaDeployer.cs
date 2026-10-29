@@ -1,8 +1,11 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Renci.SshNet;
 using UnityEditor;
 using UnityEngine;
 
@@ -31,7 +34,7 @@ namespace AutoBuilder.Editor
 
             try
             {
-                var sshSynced = SyncToRemoteVpsViaSsh(webGlBuildFolder, slug, cleanVersion, config);
+                var sshSynced = await Task.Run(() => SyncToRemoteVpsViaSshNet(webGlBuildFolder, slug, cleanVersion, config));
                 if (!sshSynced)
                 {
                     Debug.LogError("[AutoBuilder Penta] SSH sync could not be completed. Aborting deployment.");
@@ -71,114 +74,164 @@ namespace AutoBuilder.Editor
             }
         }
 
-        private static bool SyncToRemoteVpsViaSsh(string webGlBuildFolder, string slug, string cleanVersion, WebGlBuildConfigSO config)
+        private static bool SyncToRemoteVpsViaSshNet(string webGlBuildFolder, string slug, string cleanVersion, WebGlBuildConfigSO config)
         {
-            var syncScriptPath = ResolveSshSyncScriptPath();
-            if (string.IsNullOrEmpty(syncScriptPath) || !File.Exists(syncScriptPath))
-            {
-                Debug.LogError($"[AutoBuilder Penta] SSH sync script not found: {syncScriptPath}");
-                return false;
-            }
-
-            var nodeExecutable = ResolveNodeExecutable();
-            if (string.IsNullOrEmpty(nodeExecutable))
-            {
-                Debug.LogError("[AutoBuilder Penta] Node.js executable could not be found! Please install Node.js (https://nodejs.org) on this machine.");
-                return false;
-            }
-
             var host = config.GetEffectiveSshHost();
             var port = config.GetEffectiveSshPort();
             var username = config.GetEffectiveSshUsername();
             var password = config.SshPassword;
             var remoteBasePath = config.GetEffectiveSshRemotePath();
 
-            Debug.Log($"[AutoBuilder Penta] Using Node.js at: {nodeExecutable}");
-            Debug.Log($"[AutoBuilder Penta] Uploading build to VPS via SSH ({username}@{host}:{port})...");
+            Debug.Log($"[AutoBuilder Penta] Normalizing and packaging WebGL build: {slug} ({cleanVersion})...");
+            NormalizeGzipFiles(webGlBuildFolder);
 
-            var arguments = $"\"{syncScriptPath}\" \"{webGlBuildFolder}\" \"{slug}\" \"{cleanVersion}\" \"{host}\" \"{port}\" \"{username}\" \"{password}\" \"{remoteBasePath}\"";
-            var workingDir = Path.GetDirectoryName(syncScriptPath);
-            var exitCode = ProcessRunner.Run(nodeExecutable, arguments, workingDir, true);
+            var tempArchiveName = $"proto_{slug}_{cleanVersion}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.tar.gz";
+            var tempArchivePath = Path.Combine(Path.GetTempPath(), tempArchiveName);
 
-            if (exitCode == 0)
+            try
             {
-                Debug.Log("[AutoBuilder Penta] WebGL prototype successfully deployed to VPS via SSH!");
+                var tarSuccess = CreateTarGz(webGlBuildFolder, tempArchivePath);
+                if (!tarSuccess || !File.Exists(tempArchivePath))
+                {
+                    Debug.LogError("[AutoBuilder Penta] Failed to create tar.gz archive.");
+                    return false;
+                }
+
+                Debug.Log($"[AutoBuilder Penta] Connecting directly to VPS via C# SSH ({username}@{host}:{port})...");
+                var connectionInfo = new ConnectionInfo(host, port, username, new PasswordAuthenticationMethod(username, password))
+                {
+                    Timeout = TimeSpan.FromSeconds(30)
+                };
+
+                using var sftp = new SftpClient(connectionInfo);
+                sftp.Connect();
+                Debug.Log("[AutoBuilder Penta] SFTP Connected.");
+
+                var remoteArchivePath = $"{remoteBasePath}/{tempArchiveName}";
+                var remoteDestDir = $"{remoteBasePath}/public/prototypes/{slug}/{cleanVersion}";
+
+                Debug.Log($"[AutoBuilder Penta] Uploading archive to {remoteArchivePath}...");
+                using (var fileStream = File.OpenRead(tempArchivePath))
+                {
+                    sftp.UploadFile(fileStream, remoteArchivePath, true);
+                }
+                sftp.Disconnect();
+
+                using var ssh = new SshClient(connectionInfo);
+                ssh.Connect();
+                Debug.Log("[AutoBuilder Penta] SSH Connected.");
+
+                Debug.Log($"[AutoBuilder Penta] Extracting remote archive to {remoteDestDir}...");
+                var extractCmd = $"mkdir -p {remoteDestDir} && tar -xzf {remoteArchivePath} -C {remoteDestDir} && rm -f {remoteArchivePath}";
+                var result = ssh.RunCommand(extractCmd);
+                if (result.ExitStatus != 0)
+                {
+                    Debug.LogError($"[AutoBuilder Penta] Remote extraction failed: {result.Error} {result.Result}");
+                    return false;
+                }
+
+                Debug.Log("[AutoBuilder Penta] Syncing files into penta-web Docker container...");
+                var dockerCommands = new[]
+                {
+                    $"docker exec penta-web mkdir -p /app/public/prototypes/{slug}/{cleanVersion}",
+                    $"docker cp {remoteDestDir}/. penta-web:/app/public/prototypes/{slug}/{cleanVersion}/",
+                    $"docker exec penta-web chmod -R 755 /app/public/prototypes/{slug}/{cleanVersion}",
+                    "docker restart penta-web"
+                };
+
+                foreach (var cmd in dockerCommands)
+                {
+                    var cmdResult = ssh.RunCommand(cmd);
+                    if (cmdResult.ExitStatus != 0)
+                    {
+                        Debug.LogWarning($"[AutoBuilder Penta] Docker container command warning ({cmd}): {cmdResult.Error} {cmdResult.Result}");
+                    }
+                }
+
+                ssh.Disconnect();
+                Debug.Log("[AutoBuilder Penta] Prototype files synchronized and live on VPS!");
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[AutoBuilder Penta] SSH/SFTP deployment failed: {exception.Message}\n{exception.StackTrace}");
+                return false;
+            }
+            finally
+            {
+                if (File.Exists(tempArchivePath))
+                {
+                    try
+                    {
+                        File.Delete(tempArchivePath);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
+        private static bool CreateTarGz(string sourceDir, string destinationTarGzPath)
+        {
+            var systemTar = "tar.exe";
+            var parentDir = Path.GetDirectoryName(sourceDir);
+            var folderName = Path.GetFileName(sourceDir);
+
+            var code = ProcessRunner.Run(systemTar, $"-czf \"{destinationTarGzPath}\" -C \"{sourceDir}\" .", sourceDir, true);
+            if (code == 0 && File.Exists(destinationTarGzPath))
+            {
                 return true;
             }
 
-            Debug.LogError($"[AutoBuilder Penta] SSH deployment failed with exit code: {exitCode}");
             return false;
         }
 
-        private static string ResolveNodeExecutable()
+        private static void NormalizeGzipFiles(string sourceDir)
         {
-            var systemPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-            var pathParts = systemPath.Split(Path.PathSeparator);
-
-            foreach (var part in pathParts)
+            try
             {
-                if (string.IsNullOrWhiteSpace(part))
+                var buildDir = Path.Combine(sourceDir, "Build");
+                if (!Directory.Exists(buildDir))
                 {
-                    continue;
+                    return;
                 }
 
-                try
+                var files = Directory.GetFiles(buildDir);
+                var converted = false;
+
+                foreach (var file in files)
                 {
-                    var candidate = Path.Combine(part.Trim(), "node.exe");
-                    if (File.Exists(candidate))
+                    if (file.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
                     {
-                        return candidate;
+                        var rawName = file.Substring(0, file.Length - 3);
+                        if (!File.Exists(rawName))
+                        {
+                            using (var originalStream = File.OpenRead(file))
+                            using (var decompressedStream = File.Create(rawName))
+                            using (var gzipStream = new GZipStream(originalStream, CompressionMode.Decompress))
+                            {
+                                gzipStream.CopyTo(decompressedStream);
+                            }
+                            converted = true;
+                        }
                     }
                 }
-                catch
+
+                var indexPath = Path.Combine(sourceDir, "index.html");
+                if (converted && File.Exists(indexPath))
                 {
+                    var html = File.ReadAllText(indexPath);
+                    html = Regex.Replace(html, @"\.data\.(br|gz)", ".data");
+                    html = Regex.Replace(html, @"\.framework\.js\.(br|gz)", ".framework.js");
+                    html = Regex.Replace(html, @"\.wasm\.(br|gz)", ".wasm");
+                    File.WriteAllText(indexPath, html);
                 }
             }
-
-            var programFilesNode = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe");
-            if (File.Exists(programFilesNode))
+            catch (Exception ex)
             {
-                return programFilesNode;
+                Debug.LogWarning($"[AutoBuilder Penta] Warning during compression normalization: {ex.Message}");
             }
-
-            var unityEditorDir = Path.GetDirectoryName(EditorApplication.applicationPath);
-            if (!string.IsNullOrEmpty(unityEditorDir))
-            {
-                var unityNode = Path.Combine(unityEditorDir, "Data", "PlaybackEngines", "WebGLSupport", "BuildTools", "Emscripten", "node", "node.exe");
-                if (File.Exists(unityNode))
-                {
-                    return unityNode;
-                }
-            }
-
-            return "node.exe";
-        }
-
-        private static string ResolveSshSyncScriptPath()
-        {
-            var guids = AssetDatabase.FindAssets("penta_ssh_sync");
-            if (guids != null && guids.Length > 0)
-            {
-                var relativePath = AssetDatabase.GUIDToAssetPath(guids[0]);
-                if (!string.IsNullOrEmpty(relativePath))
-                {
-                    return Path.GetFullPath(relativePath);
-                }
-            }
-
-            var directPath = Path.Combine(Application.dataPath, "..", "Packages", "com.tmn.core", "AutoBuilder", "Editor", "Utilities", "penta_ssh_sync.cjs");
-            if (File.Exists(directPath))
-            {
-                return Path.GetFullPath(directPath);
-            }
-
-            var localRepoPath = Path.Combine("C:", "UnityWorks", "TMN", "TMNCore", "AutoBuilder", "Editor", "Utilities", "penta_ssh_sync.cjs");
-            if (File.Exists(localRepoPath))
-            {
-                return localRepoPath;
-            }
-
-            return string.Empty;
         }
 
         private static async Task<bool> RegisterBuildToPentaApiAsync(string serverUrl, string apiKey, string slug, string baseName, string version, string buildUrl, string aspectRatio)
@@ -196,7 +249,7 @@ namespace AutoBuilder.Editor
                 version = version,
                 buildUrl = buildUrl,
                 aspectRatio = aspectRatio,
-                notes = "Automated deploy via Unity AutoBuilder SSH",
+                notes = "Automated deploy via Unity AutoBuilder Native SSH",
                 makeActive = true
             };
 
