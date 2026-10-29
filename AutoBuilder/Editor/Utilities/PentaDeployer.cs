@@ -29,32 +29,12 @@ namespace AutoBuilder.Editor
             var apiKey = config.GetEffectiveApiKey();
             var aspectRatio = config.GetEffectiveAspectRatio();
 
-            var targetParent = Path.Combine(config.PentaProjectPath, "public", "prototypes", slug, cleanVersion);
-
             try
             {
-                if (Directory.Exists(config.PentaProjectPath))
+                var sshSynced = SyncToRemoteVpsViaSsh(webGlBuildFolder, slug, cleanVersion, config);
+                if (!sshSynced)
                 {
-                    Debug.Log($"[AutoBuilder Penta] Deploying WebGL files to local Penta folder: {targetParent}");
-
-                    if (Directory.Exists(targetParent))
-                    {
-                        ProcessRunner.DeleteDirectoryWithRetries(targetParent);
-                    }
-
-                    Directory.CreateDirectory(targetParent);
-                    ProcessRunner.CopyDirectory(webGlBuildFolder, targetParent);
-
-                    Debug.Log("[AutoBuilder Penta] Files successfully copied to local Penta prototypes directory.");
-
-                    if (config.SyncRemoteVps)
-                    {
-                        SyncToRemoteVps(config.PentaProjectPath, targetParent, slug, cleanVersion);
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning($"[AutoBuilder Penta] Penta project path not found on disk: {config.PentaProjectPath}");
+                    Debug.LogWarning("[AutoBuilder Penta] SSH sync could not be completed. Will attempt API registration anyway.");
                 }
 
                 var relativeUrl = $"/prototypes/{slug}/{cleanVersion}/index.html";
@@ -70,7 +50,7 @@ namespace AutoBuilder.Editor
                     {
                         var open = EditorUtility.DisplayDialog(
                             "Penta Deployment Success",
-                            $"WebGL build {cleanVersion} was successfully deployed to Penta!\n\nOpen WebGL player in browser now?",
+                            $"WebGL build {cleanVersion} was successfully deployed to Penta VPS via SSH!\n\nOpen WebGL player in browser now?",
                             "Open in Browser",
                             "Close");
 
@@ -90,27 +70,62 @@ namespace AutoBuilder.Editor
             }
         }
 
-        private static void SyncToRemoteVps(string pentaProjectPath, string targetParent, string slug, string cleanVersion)
+        private static bool SyncToRemoteVpsViaSsh(string webGlBuildFolder, string slug, string cleanVersion, WebGlBuildConfigSO config)
         {
-            var syncScriptPath = Path.Combine(pentaProjectPath, "scripts", "sync_prototype_remote.cjs");
-            if (!File.Exists(syncScriptPath))
+            var syncScriptPath = ResolveSshSyncScriptPath();
+            if (string.IsNullOrEmpty(syncScriptPath) || !File.Exists(syncScriptPath))
             {
-                Debug.LogWarning($"[AutoBuilder Penta] sync_prototype_remote.cjs not found at: {syncScriptPath}");
-                return;
+                Debug.LogError($"[AutoBuilder Penta] SSH sync script not found: {syncScriptPath}");
+                return false;
             }
 
-            Debug.Log("[AutoBuilder Penta] Syncing prototype files to live Penta VPS...");
-            var arguments = $"\"{syncScriptPath}\" \"{targetParent}\" \"{slug}\" \"{cleanVersion}\"";
-            var exitCode = ProcessRunner.Run("node.exe", arguments, pentaProjectPath, true);
+            var host = config.GetEffectiveSshHost();
+            var port = config.GetEffectiveSshPort();
+            var username = config.GetEffectiveSshUsername();
+            var password = config.SshPassword;
+            var remoteBasePath = config.GetEffectiveSshRemotePath();
+
+            Debug.Log($"[AutoBuilder Penta] Uploading build to VPS via SSH ({username}@{host}:{port})...");
+
+            var arguments = $"\"{syncScriptPath}\" \"{webGlBuildFolder}\" \"{slug}\" \"{cleanVersion}\" \"{host}\" \"{port}\" \"{username}\" \"{password}\" \"{remoteBasePath}\"";
+            var workingDir = Path.GetDirectoryName(syncScriptPath);
+            var exitCode = ProcessRunner.Run("node.exe", arguments, workingDir, true);
 
             if (exitCode == 0)
             {
-                Debug.Log("[AutoBuilder Penta] Prototype files successfully synchronized to live VPS!");
+                Debug.Log("[AutoBuilder Penta] WebGL prototype successfully deployed to VPS via SSH!");
+                return true;
             }
-            else
+
+            Debug.LogError($"[AutoBuilder Penta] SSH deployment failed with exit code: {exitCode}");
+            return false;
+        }
+
+        private static string ResolveSshSyncScriptPath()
+        {
+            var guids = AssetDatabase.FindAssets("penta_ssh_sync");
+            if (guids != null && guids.Length > 0)
             {
-                Debug.LogWarning($"[AutoBuilder Penta] Prototype VPS sync exited with code {exitCode}. Files are still available locally.");
+                var relativePath = AssetDatabase.GUIDToAssetPath(guids[0]);
+                if (!string.IsNullOrEmpty(relativePath))
+                {
+                    return Path.GetFullPath(relativePath);
+                }
             }
+
+            var directPath = Path.Combine(Application.dataPath, "..", "Packages", "com.tmn.core", "AutoBuilder", "Editor", "Utilities", "penta_ssh_sync.cjs");
+            if (File.Exists(directPath))
+            {
+                return Path.GetFullPath(directPath);
+            }
+
+            var localRepoPath = Path.Combine("C:", "UnityWorks", "TMN", "TMNCore", "AutoBuilder", "Editor", "Utilities", "penta_ssh_sync.cjs");
+            if (File.Exists(localRepoPath))
+            {
+                return localRepoPath;
+            }
+
+            return string.Empty;
         }
 
         private static async Task<bool> RegisterBuildToPentaApiAsync(string serverUrl, string apiKey, string slug, string baseName, string version, string buildUrl, string aspectRatio)
@@ -128,7 +143,7 @@ namespace AutoBuilder.Editor
                 version = version,
                 buildUrl = buildUrl,
                 aspectRatio = aspectRatio,
-                notes = "Automated deploy via Unity AutoBuilder",
+                notes = "Automated deploy via Unity AutoBuilder SSH",
                 makeActive = true
             };
 
@@ -172,7 +187,7 @@ namespace AutoBuilder.Editor
                 }
                 catch (Exception exception)
                 {
-                    Debug.LogWarning($"[AutoBuilder Penta] Could not reach Penta API at {endpoint}: {exception.Message}. WebGL files remain in prototypes folder.");
+                    Debug.LogWarning($"[AutoBuilder Penta] Could not reach Penta API at {endpoint}: {exception.Message}");
                     return false;
                 }
             }

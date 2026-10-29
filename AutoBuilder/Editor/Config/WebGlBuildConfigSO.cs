@@ -7,17 +7,20 @@ namespace AutoBuilder.Editor
     public class WebGlBuildConfigSO : ScriptableObject
     {
         private const string PentaApiKeyPrefKey = "AutoBuilder_WebGL_PentaApiKey";
+        private const string SshPasswordPrefKey = "AutoBuilder_WebGL_SshPassword";
 
         [SerializeField] private WebGLCompressionFormat compressionFormat = WebGLCompressionFormat.Disabled;
         [SerializeField] private string templateName = "APPLICATION:Default";
         [SerializeField] private bool autoStartLocalServer;
         [SerializeField] private int localServerPort = 8080;
         [SerializeField] private bool enablePentaDeployment = true;
-        [SerializeField] private string pentaProjectPath = "C:/WebProjects/Penta";
         [SerializeField] private string pentaServerUrl = "https://penta.zart-zurt.com";
         [SerializeField] private string pentaGameSlug = "";
         [SerializeField] private string pentaAspectRatio = "9:16";
-        [SerializeField] private bool syncRemoteVps = true;
+        [SerializeField] private string sshHost = "72.62.38.185";
+        [SerializeField] private int sshPort = 22;
+        [SerializeField] private string sshUsername = "root";
+        [SerializeField] private string sshRemotePath = "/root/penta";
 
         public WebGLCompressionFormat CompressionFormat
         {
@@ -49,12 +52,6 @@ namespace AutoBuilder.Editor
             set => enablePentaDeployment = value;
         }
 
-        public string PentaProjectPath
-        {
-            get => pentaProjectPath;
-            set => pentaProjectPath = value;
-        }
-
         public string PentaServerUrl
         {
             get => pentaServerUrl;
@@ -79,10 +76,34 @@ namespace AutoBuilder.Editor
             set => pentaAspectRatio = value;
         }
 
-        public bool SyncRemoteVps
+        public string SshHost
         {
-            get => syncRemoteVps;
-            set => syncRemoteVps = value;
+            get => sshHost;
+            set => sshHost = value;
+        }
+
+        public int SshPort
+        {
+            get => sshPort;
+            set => sshPort = value;
+        }
+
+        public string SshUsername
+        {
+            get => sshUsername;
+            set => sshUsername = value;
+        }
+
+        public string SshPassword
+        {
+            get => EditorPrefs.GetString(SshPasswordPrefKey, "");
+            set => EditorPrefs.SetString(SshPasswordPrefKey, value ?? "");
+        }
+
+        public string SshRemotePath
+        {
+            get => sshRemotePath;
+            set => sshRemotePath = value;
         }
 
         public string GetEffectiveServerUrl()
@@ -133,6 +154,26 @@ namespace AutoBuilder.Editor
         public string GetEffectiveAspectRatio()
         {
             return string.IsNullOrEmpty(pentaAspectRatio) ? "9:16" : pentaAspectRatio.Trim();
+        }
+
+        public string GetEffectiveSshHost()
+        {
+            return string.IsNullOrEmpty(sshHost) ? "72.62.38.185" : sshHost.Trim();
+        }
+
+        public int GetEffectiveSshPort()
+        {
+            return sshPort > 0 ? sshPort : 22;
+        }
+
+        public string GetEffectiveSshUsername()
+        {
+            return string.IsNullOrEmpty(sshUsername) ? "root" : sshUsername.Trim();
+        }
+
+        public string GetEffectiveSshRemotePath()
+        {
+            return string.IsNullOrEmpty(sshRemotePath) ? "/root/penta" : sshRemotePath.TrimEnd('/');
         }
     }
 }

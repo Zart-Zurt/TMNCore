@@ -36,30 +36,25 @@ namespace AutoBuilder.Editor
             _config.TemplateName = EditorGUILayout.TextField("WebGL Template", _config.TemplateName);
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Penta Studio WebGL Integration", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Penta Studio WebGL Integration (SSH Remote)", EditorStyles.boldLabel);
             _config.EnablePentaDeployment = EditorGUILayout.Toggle("Deploy to Penta", _config.EnablePentaDeployment);
 
             if (_config.EnablePentaDeployment)
             {
-                EditorGUILayout.BeginHorizontal();
-                _config.PentaProjectPath = EditorGUILayout.TextField("Penta Project Path", _config.PentaProjectPath);
-                if (GUILayout.Button("Browse", GUILayout.Width(70)))
-                {
-                    var selected = EditorUtility.OpenFolderPanel("Select Penta Project Root", _config.PentaProjectPath, "");
-                    if (!string.IsNullOrEmpty(selected))
-                    {
-                        _config.PentaProjectPath = selected;
-                    }
-                }
-                EditorGUILayout.EndHorizontal();
-
                 _config.PentaServerUrl = EditorGUILayout.TextField("Penta Server URL", _config.PentaServerUrl);
                 _config.PentaGameSlug = EditorGUILayout.TextField("Game Slug", _config.PentaGameSlug);
                 _config.PentaApiKey = EditorGUILayout.PasswordField("API Key", _config.PentaApiKey);
                 _config.PentaAspectRatio = EditorGUILayout.TextField("Aspect Ratio", _config.PentaAspectRatio);
-                _config.SyncRemoteVps = EditorGUILayout.Toggle("Sync to Live VPS", _config.SyncRemoteVps);
 
-                EditorGUILayout.Space(2);
+                EditorGUILayout.Space(4);
+                EditorGUILayout.LabelField("SSH VPS Connection", EditorStyles.miniBoldLabel);
+                _config.SshHost = EditorGUILayout.TextField("SSH Host", _config.SshHost);
+                _config.SshPort = EditorGUILayout.IntField("SSH Port", _config.SshPort);
+                _config.SshUsername = EditorGUILayout.TextField("SSH Username", _config.SshUsername);
+                _config.SshPassword = EditorGUILayout.PasswordField("SSH Password", _config.SshPassword);
+                _config.SshRemotePath = EditorGUILayout.TextField("Remote Path", _config.SshRemotePath);
+
+                EditorGUILayout.Space(4);
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("Deploy Last Build to Penta", GUILayout.Height(28)))
                 {
