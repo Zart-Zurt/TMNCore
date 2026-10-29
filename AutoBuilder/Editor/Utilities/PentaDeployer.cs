@@ -31,10 +31,15 @@ namespace AutoBuilder.Editor
             var serverUrl = config.GetEffectiveServerUrl();
             var apiKey = config.GetEffectiveApiKey();
             var aspectRatio = config.GetEffectiveAspectRatio();
+            var host = config.GetEffectiveSshHost();
+            var port = config.GetEffectiveSshPort();
+            var username = config.GetEffectiveSshUsername();
+            var password = config.SshPassword;
+            var remoteBasePath = config.GetEffectiveSshRemotePath();
 
             try
             {
-                var sshSynced = await Task.Run(() => SyncToRemoteVpsViaSshNet(webGlBuildFolder, slug, cleanVersion, config));
+                var sshSynced = await Task.Run(() => SyncToRemoteVpsViaSshNet(webGlBuildFolder, slug, cleanVersion, host, port, username, password, remoteBasePath));
                 if (!sshSynced)
                 {
                     Debug.LogError("[AutoBuilder Penta] SSH sync could not be completed. Aborting deployment.");
@@ -74,14 +79,8 @@ namespace AutoBuilder.Editor
             }
         }
 
-        private static bool SyncToRemoteVpsViaSshNet(string webGlBuildFolder, string slug, string cleanVersion, WebGlBuildConfigSO config)
+        private static bool SyncToRemoteVpsViaSshNet(string webGlBuildFolder, string slug, string cleanVersion, string host, int port, string username, string password, string remoteBasePath)
         {
-            var host = config.GetEffectiveSshHost();
-            var port = config.GetEffectiveSshPort();
-            var username = config.GetEffectiveSshUsername();
-            var password = config.SshPassword;
-            var remoteBasePath = config.GetEffectiveSshRemotePath();
-
             Debug.Log($"[AutoBuilder Penta] Normalizing and packaging WebGL build: {slug} ({cleanVersion})...");
             NormalizeGzipFiles(webGlBuildFolder);
 
