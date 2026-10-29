@@ -16,17 +16,37 @@ namespace AutoBuilder.Editor
                 var startInfo = new ProcessStartInfo(executable, arguments)
                 {
                     WorkingDirectory = string.IsNullOrEmpty(workingDirectory) ? Path.GetDirectoryName(executable) : workingDirectory,
-                    UseShellExecute = !createNoWindow,
-                    CreateNoWindow = createNoWindow
+                    UseShellExecute = false,
+                    CreateNoWindow = createNoWindow,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
                 };
 
-                using (var process = Process.Start(startInfo))
+                using (var process = new Process())
                 {
-                    if (process == null)
+                    process.StartInfo = startInfo;
+                    process.OutputDataReceived += (_, e) =>
+                    {
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            Debug.Log($"[ProcessRunner Output] {e.Data}");
+                        }
+                    };
+                    process.ErrorDataReceived += (_, e) =>
+                    {
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            Debug.LogError($"[ProcessRunner Error] {e.Data}");
+                        }
+                    };
+
+                    if (!process.Start())
                     {
                         return -1;
                     }
 
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
                     process.WaitForExit();
                     return process.ExitCode;
                 }

@@ -43,8 +43,16 @@ function resolveNodeSsh()
     }
   }
 
-  console.log("[Penta Deploy] Installing node-ssh globally...");
-  execSync("npm install -g node-ssh", { stdio: "inherit" });
+  console.log("[Penta Deploy] Installing node-ssh...");
+  try
+  {
+    execSync("npm install -g node-ssh", { stdio: "inherit" });
+  }
+  catch (e)
+  {
+    console.warn("[Penta Deploy] Global npm install failed, trying local install...");
+    execSync("npm install node-ssh --no-save", { cwd: __dirname, stdio: "inherit" });
+  }
 
   for (const root of globalRoots)
   {
@@ -54,6 +62,13 @@ function resolveNodeSsh()
       const mod = require(target);
       return mod.NodeSSH || mod;
     }
+  }
+
+  const localTarget = path.join(__dirname, "node_modules", "node-ssh");
+  if (fs.existsSync(localTarget))
+  {
+    const mod = require(localTarget);
+    return mod.NodeSSH || mod;
   }
 
   const fallback = require("node-ssh");
