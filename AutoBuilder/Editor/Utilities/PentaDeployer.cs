@@ -81,8 +81,7 @@ namespace AutoBuilder.Editor
 
         private static bool SyncToRemoteVpsViaSshNet(string webGlBuildFolder, string slug, string cleanVersion, string host, int port, string username, string password, string remoteBasePath)
         {
-            Debug.Log($"[AutoBuilder Penta] Normalizing and packaging WebGL build: {slug} ({cleanVersion})...");
-            NormalizeGzipFiles(webGlBuildFolder);
+            Debug.Log($"[AutoBuilder Penta] Packaging WebGL build: {slug} ({cleanVersion})...");
 
             var tempArchiveName = $"proto_{slug}_{cleanVersion}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.tar.gz";
             var tempArchivePath = Path.Combine(Path.GetTempPath(), tempArchiveName);
@@ -186,52 +185,6 @@ namespace AutoBuilder.Editor
             return false;
         }
 
-        private static void NormalizeGzipFiles(string sourceDir)
-        {
-            try
-            {
-                var buildDir = Path.Combine(sourceDir, "Build");
-                if (!Directory.Exists(buildDir))
-                {
-                    return;
-                }
-
-                var files = Directory.GetFiles(buildDir);
-                var converted = false;
-
-                foreach (var file in files)
-                {
-                    if (file.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var rawName = file.Substring(0, file.Length - 3);
-                        if (!File.Exists(rawName))
-                        {
-                            using (var originalStream = File.OpenRead(file))
-                            using (var decompressedStream = File.Create(rawName))
-                            using (var gzipStream = new GZipStream(originalStream, CompressionMode.Decompress))
-                            {
-                                gzipStream.CopyTo(decompressedStream);
-                            }
-                            converted = true;
-                        }
-                    }
-                }
-
-                var indexPath = Path.Combine(sourceDir, "index.html");
-                if (converted && File.Exists(indexPath))
-                {
-                    var html = File.ReadAllText(indexPath);
-                    html = Regex.Replace(html, @"\.data\.(br|gz)", ".data");
-                    html = Regex.Replace(html, @"\.framework\.js\.(br|gz)", ".framework.js");
-                    html = Regex.Replace(html, @"\.wasm\.(br|gz)", ".wasm");
-                    File.WriteAllText(indexPath, html);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[AutoBuilder Penta] Warning during compression normalization: {ex.Message}");
-            }
-        }
 
         private static async Task<bool> RegisterBuildToPentaApiAsync(string serverUrl, string apiKey, string slug, string baseName, string version, string buildUrl, string aspectRatio)
         {

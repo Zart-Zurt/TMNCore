@@ -143,15 +143,14 @@ namespace AutoBuilder.Editor
                     return;
                 }
 
-                var extension = Path.GetExtension(targetFilePath).ToLowerInvariant();
-                var mime = GetMimeType(extension);
+                var mime = GetMimeType(targetFilePath);
                 response.ContentType = mime;
 
-                if (extension == ".gz" || targetFilePath.EndsWith(".unityweb") && IsGzipFile(targetFilePath))
+                if (targetFilePath.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) || targetFilePath.EndsWith(".unityweb", StringComparison.OrdinalIgnoreCase) && IsGzipFile(targetFilePath))
                 {
                     response.AddHeader("Content-Encoding", "gzip");
                 }
-                else if (extension == ".br")
+                else if (targetFilePath.EndsWith(".br", StringComparison.OrdinalIgnoreCase))
                 {
                     response.AddHeader("Content-Encoding", "br");
                 }
@@ -202,38 +201,60 @@ namespace AutoBuilder.Editor
             }
         }
 
-        private static string GetMimeType(string extension)
+        private static string GetMimeType(string path)
         {
-            switch (extension)
+            var lower = path.ToLowerInvariant();
+            if (lower.EndsWith(".js") || lower.EndsWith(".js.gz") || lower.EndsWith(".js.br"))
             {
-                case ".html":
-                case ".htm":
-                    return "text/html";
-                case ".js":
-                    return "application/javascript";
-                case ".wasm":
-                    return "application/wasm";
-                case ".data":
-                case ".symbols":
-                    return "application/octet-stream";
-                case ".css":
-                    return "text/css";
-                case ".json":
-                    return "application/json";
-                case ".png":
-                    return "image/png";
-                case ".jpg":
-                case ".jpeg":
-                    return "image/jpeg";
-                case ".gif":
-                    return "image/gif";
-                case ".ico":
-                    return "image/x-icon";
-                case ".svg":
-                    return "image/svg+xml";
-                default:
-                    return "application/octet-stream";
+                return "application/javascript";
             }
+
+            if (lower.EndsWith(".wasm") || lower.EndsWith(".wasm.gz") || lower.EndsWith(".wasm.br"))
+            {
+                return "application/wasm";
+            }
+
+            if (lower.EndsWith(".html") || lower.EndsWith(".htm"))
+            {
+                return "text/html";
+            }
+
+            if (lower.EndsWith(".css"))
+            {
+                return "text/css";
+            }
+
+            if (lower.EndsWith(".json"))
+            {
+                return "application/json";
+            }
+
+            if (lower.EndsWith(".png"))
+            {
+                return "image/png";
+            }
+
+            if (lower.EndsWith(".jpg") || lower.EndsWith(".jpeg"))
+            {
+                return "image/jpeg";
+            }
+
+            if (lower.EndsWith(".gif"))
+            {
+                return "image/gif";
+            }
+
+            if (lower.EndsWith(".ico"))
+            {
+                return "image/x-icon";
+            }
+
+            if (lower.EndsWith(".svg"))
+            {
+                return "image/svg+xml";
+            }
+
+            return "application/octet-stream";
         }
     }
 }
