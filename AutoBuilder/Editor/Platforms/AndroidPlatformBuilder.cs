@@ -1,5 +1,7 @@
+using System;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
@@ -32,6 +34,10 @@ namespace AutoBuilder.Editor
 
             EditorGUILayout.LabelField("Android Build Options", EditorStyles.boldLabel);
 
+            var currentAppId = string.IsNullOrEmpty(_config.ApplicationIdentifier)
+                ? PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android)
+                : _config.ApplicationIdentifier;
+            _config.ApplicationIdentifier = EditorGUILayout.TextField("Package Name (App ID)", currentAppId);
             _config.BuildAppBundle = EditorGUILayout.Toggle("Build App Bundle (.aab)", _config.BuildAppBundle);
             _config.TargetArchitectures = (AndroidArchitecture)EditorGUILayout.EnumPopup("Target Architecture", _config.TargetArchitectures);
 
@@ -90,24 +96,81 @@ namespace AutoBuilder.Editor
 
             ScriptingDefinesManager.ApplyCommonDefines(TargetGroup, context.EnableCheats, context.DisableRemoteData, "ANDROID_BUILD");
 
-            EditorUserBuildSettings.buildAppBundle = _config.BuildAppBundle;
+            var effectiveAppId = !string.IsNullOrWhiteSpace(context.AndroidApplicationIdentifierOverride)
+                ? context.AndroidApplicationIdentifierOverride.Trim()
+                : _config.ApplicationIdentifier?.Trim();
+
+            if (!string.IsNullOrEmpty(effectiveAppId))
+            {
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, effectiveAppId);
+            }
+
+            if (!string.IsNullOrEmpty(context.Version))
+            {
+                PlayerSettings.bundleVersion = context.Version;
+            }
+
+            var effectiveAppBundle = context.AndroidBuildAppBundleOverride ?? _config.BuildAppBundle;
+            EditorUserBuildSettings.buildAppBundle = effectiveAppBundle;
             PlayerSettings.Android.targetArchitectures = _config.TargetArchitectures;
 
-            if (_config.UseCustomKeystore && File.Exists(_config.KeystorePath))
+            var useCustomKeystore = !string.IsNullOrWhiteSpace(context.AndroidKeystorePathOverride) || _config.UseCustomKeystore;
+            if (useCustomKeystore)
             {
+                var rawKeystorePath = !string.IsNullOrWhiteSpace(context.AndroidKeystorePathOverride)
+                    ? context.AndroidKeystorePathOverride.Trim()
+                    : _config.KeystorePath?.Trim();
+
+                var resolvedKeystorePath = ResolveKeystorePath(rawKeystorePath);
+                if (string.IsNullOrEmpty(resolvedKeystorePath) || !File.Exists(resolvedKeystorePath))
+                {
+                    throw new FileNotFoundException($"[AutoBuilder Android] Keystore file not found: {rawKeystorePath}");
+                }
+
+                var keystorePassword = !string.IsNullOrEmpty(context.AndroidKeystorePasswordOverride)
+                    ? context.AndroidKeystorePasswordOverride
+                    : _config.KeystorePassword;
+                var keyAlias = !string.IsNullOrEmpty(context.AndroidKeyAliasOverride)
+                    ? context.AndroidKeyAliasOverride
+                    : _config.KeyAlias;
+                var keyPassword = !string.IsNullOrEmpty(context.AndroidKeyPasswordOverride)
+                    ? context.AndroidKeyPasswordOverride
+                    : _config.KeyPassword;
+
+                if (string.IsNullOrEmpty(keystorePassword) || string.IsNullOrEmpty(keyAlias) || string.IsNullOrEmpty(keyPassword))
+                {
+                    throw new InvalidOperationException("[AutoBuilder Android] Custom keystore is enabled, but keystore password, key alias, or key password is missing.");
+                }
+
                 PlayerSettings.Android.useCustomKeystore = true;
-                PlayerSettings.Android.keystoreName = _config.KeystorePath;
-                PlayerSettings.Android.keystorePass = _config.KeystorePassword;
-                PlayerSettings.Android.keyaliasName = _config.KeyAlias;
-                PlayerSettings.Android.keyaliasPass = _config.KeyPassword;
+                PlayerSettings.Android.keystoreName = resolvedKeystorePath;
+                PlayerSettings.Android.keystorePass = keystorePassword;
+                PlayerSettings.Android.keyaliasName = keyAlias;
+                PlayerSettings.Android.keyaliasPass = keyPassword;
+            }
+            else
+            {
+                PlayerSettings.Android.useCustomKeystore = false;
             }
 
             if (context.VersionData != null)
             {
-                context.VersionData.androidBundleVersionCode++;
+                if (context.AndroidBundleVersionCodeOverride.HasValue)
+                {
+                    context.VersionData.androidBundleVersionCode = context.AndroidBundleVersionCodeOverride.Value;
+                }
+                else if (context.IncrementAndroidVersionCode)
+                {
+                    context.VersionData.androidBundleVersionCode++;
+                }
+
                 PlayerSettings.Android.bundleVersionCode = context.VersionData.androidBundleVersionCode;
                 EditorUtility.SetDirty(context.VersionData);
                 AssetDatabase.SaveAssets();
+            }
+            else if (context.AndroidBundleVersionCodeOverride.HasValue)
+            {
+                PlayerSettings.Android.bundleVersionCode = context.AndroidBundleVersionCodeOverride.Value;
             }
         }
 
@@ -115,15 +178,12 @@ namespace AutoBuilder.Editor
         {
             _context = context;
 
-            var folder = Path.Combine(context.OutputDirectory, "Android");
-            if (!Directory.Exists(folder))
+            var fullPath = ResolveOutputPath(context);
+            var folder = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrEmpty(folder) && !Directory.Exists(folder))
             {
                 Directory.CreateDirectory(folder);
             }
-
-            var extension = _config.BuildAppBundle ? "aab" : "apk";
-            var fileName = $"{context.CleanName}_v{context.Version}.{extension}";
-            var fullPath = Path.Combine(folder, fileName);
 
             if (File.Exists(fullPath))
             {
@@ -155,12 +215,10 @@ namespace AutoBuilder.Editor
                 AssetDatabase.SaveAssets();
             }
 
-            var folder = Path.Combine(context.OutputDirectory, "Android");
-            var extension = _config.BuildAppBundle ? "aab" : "apk";
-            var fileName = $"{context.CleanName}_v{context.Version}.{extension}";
-            var fullPath = Path.Combine(folder, fileName);
+            var effectiveAppBundle = context.AndroidBuildAppBundleOverride ?? _config.BuildAppBundle;
+            var fullPath = ResolveOutputPath(context);
 
-            if (!_config.BuildAppBundle && _config.AutoInstallViaAdb && File.Exists(fullPath))
+            if (!Application.isBatchMode && context.AllowAdbInstall && !effectiveAppBundle && _config.AutoInstallViaAdb && File.Exists(fullPath))
             {
                 Debug.Log($"[AutoBuilder Android] Attempting ADB install for: {fullPath}");
                 var code = ProcessRunner.Run("adb", $"install -r \"{fullPath}\"");
@@ -174,10 +232,48 @@ namespace AutoBuilder.Editor
                 }
             }
 
-            if (File.Exists(fullPath))
+            if (!Application.isBatchMode && File.Exists(fullPath))
             {
                 EditorUtility.RevealInFinder(fullPath);
             }
+        }
+
+        private string ResolveOutputPath(AutoBuilderContext context)
+        {
+            var effectiveAppBundle = context.AndroidBuildAppBundleOverride ?? _config.BuildAppBundle;
+            var extension = effectiveAppBundle ? "aab" : "apk";
+            var defaultFileName = $"{context.CleanName}_v{context.Version}.{extension}";
+
+            if (!string.IsNullOrWhiteSpace(context.CustomOutputPath))
+            {
+                var customPath = Path.GetFullPath(context.CustomOutputPath.Trim());
+                if (customPath.EndsWith(".aab", StringComparison.OrdinalIgnoreCase) ||
+                    customPath.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
+                {
+                    return customPath;
+                }
+
+                return Path.Combine(customPath, defaultFileName);
+            }
+
+            var folder = Path.Combine(context.OutputDirectory, "Android");
+            return Path.Combine(folder, defaultFileName);
+        }
+
+        private static string ResolveKeystorePath(string rawPath)
+        {
+            if (string.IsNullOrWhiteSpace(rawPath))
+            {
+                return string.Empty;
+            }
+
+            if (Path.IsPathRooted(rawPath))
+            {
+                return Path.GetFullPath(rawPath);
+            }
+
+            var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            return Path.GetFullPath(Path.Combine(projectRoot, rawPath));
         }
 
         public void SaveSettings()

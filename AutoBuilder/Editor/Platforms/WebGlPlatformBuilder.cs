@@ -187,7 +187,7 @@ namespace AutoBuilder.Editor
         {
             _context = context;
 
-            var folder = Path.Combine(context.OutputDirectory, "WebGL", $"{context.CleanName}_v{context.Version}");
+            var folder = ResolveOutputFolder(context);
             if (Directory.Exists(folder))
             {
                 ProcessRunner.DeleteDirectoryWithRetries(folder);
@@ -220,22 +220,46 @@ namespace AutoBuilder.Editor
                 AssetDatabase.SaveAssets();
             }
 
-            var folder = Path.Combine(context.OutputDirectory, "WebGL", $"{context.CleanName}_v{context.Version}");
+            var folder = ResolveOutputFolder(context);
 
-            if (_config.EnablePentaDeployment)
+            if (!context.SkipDeploy && _config.EnablePentaDeployment)
             {
-                _ = PentaDeployer.DeployToPentaAsync(folder, _config, context.BaseName, context.Version);
+                if (Application.isBatchMode)
+                {
+                    var deployed = PentaDeployer.DeployToPentaAsync(folder, _config, context.BaseName, context.Version).GetAwaiter().GetResult();
+                    if (!deployed)
+                    {
+                        throw new System.InvalidOperationException("[AutoBuilder WebGL] Penta deployment failed in batch mode.");
+                    }
+                }
+                else
+                {
+                    _ = PentaDeployer.DeployToPentaAsync(folder, _config, context.BaseName, context.Version);
+                }
             }
 
-            if (_config.AutoStartLocalServer && Directory.Exists(folder))
+            if (!Application.isBatchMode)
             {
-                WebGlLocalServer.StartServer(folder, _config.LocalServerPort);
+                if (_config.AutoStartLocalServer && Directory.Exists(folder))
+                {
+                    WebGlLocalServer.StartServer(folder, _config.LocalServerPort);
+                }
+
+                if (Directory.Exists(folder))
+                {
+                    EditorUtility.RevealInFinder(folder);
+                }
+            }
+        }
+
+        private static string ResolveOutputFolder(AutoBuilderContext context)
+        {
+            if (!string.IsNullOrWhiteSpace(context.CustomOutputPath))
+            {
+                return Path.GetFullPath(context.CustomOutputPath.Trim());
             }
 
-            if (Directory.Exists(folder))
-            {
-                EditorUtility.RevealInFinder(folder);
-            }
+            return Path.Combine(context.OutputDirectory, "WebGL", $"{context.CleanName}_v{context.Version}");
         }
 
         public void SaveSettings()

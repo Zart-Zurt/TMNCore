@@ -1,3 +1,4 @@
+using System;
 using UnityEditor;
 using UnityEngine;
 
@@ -66,7 +67,16 @@ namespace AutoBuilder.Editor
 
         public string PentaApiKey
         {
-            get => EditorPrefs.GetString(PentaApiKeyPrefKey, "");
+            get
+            {
+                var envValue = Environment.GetEnvironmentVariable("AUTOBUILDER_PENTA_API_KEY");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue;
+                }
+
+                return EditorPrefs.GetString(PentaApiKeyPrefKey, "");
+            }
             set => EditorPrefs.SetString(PentaApiKeyPrefKey, value ?? "");
         }
 
@@ -96,7 +106,16 @@ namespace AutoBuilder.Editor
 
         public string SshPassword
         {
-            get => EditorPrefs.GetString(SshPasswordPrefKey, "");
+            get
+            {
+                var envValue = Environment.GetEnvironmentVariable("AUTOBUILDER_SSH_PASSWORD");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue;
+                }
+
+                return EditorPrefs.GetString(SshPasswordPrefKey, "");
+            }
             set => EditorPrefs.SetString(SshPasswordPrefKey, value ?? "");
         }
 

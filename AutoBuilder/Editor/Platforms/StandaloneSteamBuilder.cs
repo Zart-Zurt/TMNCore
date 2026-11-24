@@ -227,23 +227,30 @@ namespace AutoBuilder.Editor
             if (_config.SubPlatform == SteamSubPlatform.Local)
             {
                 var zipPath = Path.Combine(context.OutputDirectory, $"{buildFolderName}.zip");
-                if (_config.AutoZip)
+                if (!Application.isBatchMode)
+                {
+                    if (_config.AutoZip)
+                    {
+                        ProcessRunner.CreateZipWithTar(buildFolder, zipPath);
+                        EditorUtility.RevealInFinder(zipPath);
+                    }
+                    else
+                    {
+                        EditorUtility.RevealInFinder(buildFolder);
+                    }
+
+                    if (_config.AutoRun)
+                    {
+                        var exePath = Path.Combine(buildFolder, exeName);
+                        if (File.Exists(exePath))
+                        {
+                            Process.Start(new ProcessStartInfo(exePath) { WorkingDirectory = buildFolder });
+                        }
+                    }
+                }
+                else if (_config.AutoZip)
                 {
                     ProcessRunner.CreateZipWithTar(buildFolder, zipPath);
-                    EditorUtility.RevealInFinder(zipPath);
-                }
-                else
-                {
-                    EditorUtility.RevealInFinder(buildFolder);
-                }
-
-                if (_config.AutoRun)
-                {
-                    var exePath = Path.Combine(buildFolder, exeName);
-                    if (File.Exists(exePath))
-                    {
-                        Process.Start(new ProcessStartInfo(exePath) { WorkingDirectory = buildFolder });
-                    }
                 }
             }
             else

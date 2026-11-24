@@ -55,19 +55,22 @@ namespace AutoBuilder.Editor
                 {
                     Debug.Log($"[AutoBuilder Penta] WebGL build deployed and live! Player URL: {webPlayerUrl}");
 
-                    EditorApplication.delayCall += () =>
+                    if (!Application.isBatchMode)
                     {
-                        var open = EditorUtility.DisplayDialog(
-                            "Penta Deployment Success",
-                            $"WebGL build {cleanVersion} was successfully deployed to Penta VPS via SSH!\n\nOpen WebGL player in browser now?",
-                            "Open in Browser",
-                            "Close");
-
-                        if (open)
+                        EditorApplication.delayCall += () =>
                         {
-                            Application.OpenURL(webPlayerUrl);
-                        }
-                    };
+                            var open = EditorUtility.DisplayDialog(
+                                "Penta Deployment Success",
+                                $"WebGL build {cleanVersion} was successfully deployed to Penta VPS via SSH!\n\nOpen WebGL player in browser now?",
+                                "Open in Browser",
+                                "Close");
+
+                            if (open)
+                            {
+                                Application.OpenURL(webPlayerUrl);
+                            }
+                        };
+                    }
                 }
 
                 return registered;

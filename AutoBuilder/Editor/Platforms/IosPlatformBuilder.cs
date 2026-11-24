@@ -158,14 +158,14 @@ namespace AutoBuilder.Editor
             {
                 var zipPath = Path.Combine(context.OutputDirectory, "iOS", $"{context.CleanName}_Xcode_v{context.Version}.zip");
                 ProcessRunner.CreateZipWithTar(folder, zipPath);
-                if (File.Exists(zipPath))
+                if (!Application.isBatchMode && File.Exists(zipPath))
                 {
                     EditorUtility.RevealInFinder(zipPath);
                     return;
                 }
             }
 
-            if (Directory.Exists(folder))
+            if (!Application.isBatchMode && Directory.Exists(folder))
             {
                 EditorUtility.RevealInFinder(folder);
             }

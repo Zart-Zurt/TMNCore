@@ -1,3 +1,4 @@
+using System;
 using UnityEditor;
 using UnityEngine;
 
@@ -9,12 +10,19 @@ namespace AutoBuilder.Editor
         private const string KeystorePasswordPrefKey = "AutoBuilder_Android_KeystorePassword";
         private const string KeyPasswordPrefKey = "AutoBuilder_Android_KeyPassword";
 
+        [SerializeField] private string applicationIdentifier = "";
         [SerializeField] private bool buildAppBundle;
         [SerializeField] private AndroidArchitecture targetArchitectures = AndroidArchitecture.ARM64;
         [SerializeField] private bool useCustomKeystore;
         [SerializeField] private string keystorePath = "";
         [SerializeField] private string keyAlias = "";
         [SerializeField] private bool autoInstallViaAdb = true;
+
+        public string ApplicationIdentifier
+        {
+            get => applicationIdentifier;
+            set => applicationIdentifier = value;
+        }
 
         public bool BuildAppBundle
         {
@@ -42,7 +50,22 @@ namespace AutoBuilder.Editor
 
         public string KeystorePassword
         {
-            get => EditorPrefs.GetString(KeystorePasswordPrefKey, "");
+            get
+            {
+                var envValue = Environment.GetEnvironmentVariable("UNITY_ANDROID_KEYSTORE_PASSWORD");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue;
+                }
+
+                envValue = Environment.GetEnvironmentVariable("AUTOBUILDER_ANDROID_KEYSTORE_PASSWORD");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue;
+                }
+
+                return EditorPrefs.GetString(KeystorePasswordPrefKey, "");
+            }
             set => EditorPrefs.SetString(KeystorePasswordPrefKey, value ?? "");
         }
 
@@ -54,7 +77,22 @@ namespace AutoBuilder.Editor
 
         public string KeyPassword
         {
-            get => EditorPrefs.GetString(KeyPasswordPrefKey, "");
+            get
+            {
+                var envValue = Environment.GetEnvironmentVariable("UNITY_ANDROID_KEY_ALIAS_PASSWORD");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue;
+                }
+
+                envValue = Environment.GetEnvironmentVariable("AUTOBUILDER_ANDROID_KEY_PASSWORD");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue;
+                }
+
+                return EditorPrefs.GetString(KeyPasswordPrefKey, "");
+            }
             set => EditorPrefs.SetString(KeyPasswordPrefKey, value ?? "");
         }
 
